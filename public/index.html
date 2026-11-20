@@ -60,6 +60,17 @@
       <p class="footnote">This interface runs locally. It does not use WebGPU or upload your image to a cloud service.</p>
     </section>
     </div>
+    <section class="panel">
+      <div class="section-title"><span>04</span><div><h2>Inference engine diagnostics</h2><p>Model files, companion weights, runtime and device checks</p></div></div>
+      <div class="engine-actions">
+        <button id="runEngineTests" class="small-button">Run tests</button>
+        <button id="repairEngine" class="small-button">Safe auto-fix</button>
+      </div>
+      <div id="engineTestState" class="report-state">Diagnostics have not run yet.</div>
+      <div id="engineChecks" class="engine-checks"><div class="empty-state">Run tests to inspect the inference setup.</div></div>
+      <p id="engineNote" class="footnote">Safe auto-fix only repairs storage folders and removes stale partial downloads. It never deletes completed model files or installs incompatible runtimes.</p>
+    </section>
+
     <footer>TERMUX I2V <span>•</span> 127.0.0.1:9999</footer>
   </main>
   <script src="/app.js"></script>
