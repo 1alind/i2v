@@ -354,7 +354,7 @@ async function loadEngineDiagnostics() {
     }
     if ($("backendChoice")) {
       const backend = data.backend || {};
-      $("backendChoice").textContent = "AUTO SELECTED: " + (backend.label || "None") + " — " + (backend.detail || "No compatible backend detected.");
+      $("backendChoice").textContent = "AUTO BUILD PLAN: " + (backend.label || "None") + " — " + (backend.detail || "No compatible backend detected.");
     }
     for (const check of data.checks || []) {
       const item = document.createElement("div");
