@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "check": "bash -n run.sh && bash -n manage.sh && node --check server.js && node --check engine/doctor.js && node --test engine/doctor.test.js"
+    "check": "bash -n r.sh && bash -n manage.sh && node --check server.js && node --check engine/doctor.js && node --test engine/doctor.test.js"
   },
   "engines": {
     "node": ">=20"
