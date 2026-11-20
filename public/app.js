@@ -335,9 +335,27 @@ async function loadEngineDiagnostics() {
   state.className = "report-state running";
   try {
     const {data} = await api("/api/engine/diagnostics");
-    state.textContent = data.ready ? "Checks passed · inference smoke test still required" : data.summary;
+    state.textContent = data.summary || "Device scan complete.";
     state.className = "report-state " + (data.ready ? "passed" : "failed");
     list.replaceChildren();
+    const device = data.device || {};
+    if ($("deviceProfile")) {
+      const parts = [
+        [device.manufacturer, device.model].filter(Boolean).join(" "),
+        device.androidVersion ? "Android " + device.androidVersion : device.os,
+        device.abi || device.architecture,
+        device.cpuCores ? device.cpuCores + " CPU cores" : "",
+        device.cpuModel || "",
+        device.hardware ? "SoC: " + device.hardware : "",
+        device.gpuDriver ? "GPU driver: " + device.gpuDriver : "",
+        device.totalMemoryBytes ? "RAM: " + (device.totalMemoryBytes / 1024 ** 3).toFixed(1) + " GiB" : ""
+      ].filter(Boolean);
+      $("deviceProfile").textContent = parts.length ? parts.join(" · ") : "Device details unavailable.";
+    }
+    if ($("backendChoice")) {
+      const backend = data.backend || {};
+      $("backendChoice").textContent = "AUTO SELECTED: " + (backend.label || "None") + " — " + (backend.detail || "No compatible backend detected.");
+    }
     for (const check of data.checks || []) {
       const item = document.createElement("div");
       item.className = "engine-check " + check.status;
