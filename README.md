@@ -49,7 +49,7 @@ Set `I2V_DATA_DIR` to change the data directory.
 - `GET /api/jobs/:id`
 - `GET /api/jobs/:id/log`
 
-The Model Manager page accepts direct HTTPS file URLs from Hugging Face and GitHub, shows download progress, transfer speed and estimated time remaining, supports cancellation, and lists/deletes stored files. Downloads are saved directly into `~/i2v-data/models`. These files are stored locally but are not automatically runnable: a compatible inference adapter is still needed.
+The Model Manager includes a built-in catalog with one-click downloads for the official MobileI2V checkpoint and the Turbo-VAED LTX decoder, plus an advanced custom-URL downloader. It shows download progress, transfer speed and estimated time remaining, supports cancellation, and lists/deletes stored files. Downloads are saved directly into `~/i2v-data/models`. The listed files are original PyTorch checkpoints, not verified Android/Termux runtime assets; downloading them does not enable generation.
 
 Generation returns HTTP 503 until a compatible inference adapter is installed. The server never labels a placeholder or fake video as generated output.
 
