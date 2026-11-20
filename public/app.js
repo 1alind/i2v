@@ -275,9 +275,8 @@ refreshModels();
 refreshDownloads();
 setInterval(refreshDownloads, 1000);
 
-if ($("setupReport")) { refreshSetupReport(); setInterval(refreshSetupReport, 5000); }
 }
-
+if ($("setupReport")) { refreshSetupReport(); setInterval(refreshSetupReport, 5000); }
 
 let lastSeenVersion = null;
 let serverWasUnavailable = false;
