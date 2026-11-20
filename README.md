@@ -21,7 +21,7 @@ pkg update
 pkg install git
 git clone https://github.com/1alind/i2v.git
 cd i2v
-bash r.sh
+bash run.sh
 ```
 
 **Automatic setup:** run `bash r.sh` for both first install and every later launch. It checks Node.js/npm versions, installs missing Termux packages, installs or repairs the project's npm dependencies, verifies that Express and Multer actually load, checks JavaScript syntax and writable storage, then starts the server. If npm installation fails, it verifies the npm cache, detects native compiler errors and installs build tools only when needed, then retries using the official npm registry. It keeps a persistent setup log at `~/i2v-data/logs/setup.log`. It does not delete model files or uploads.
