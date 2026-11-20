@@ -241,11 +241,15 @@ app.get("/api/config", (_req, res) => {
 
 app.get("/api/models", (_req, res) => {
   const models = fs.readdirSync(DIRS.models, { withFileTypes: true })
-    .filter(x => x.isFile())
+    .filter(x => x.isFile() || (x.isDirectory() && x.name === "Qwen2-0.5B"))
     .map(x => {
       const p = path.join(DIRS.models, x.name);
-      const st = fs.statSync(p);
-      return { name: x.name, bytes: st.size };
+      if (x.isFile()) return { name: x.name, bytes: fs.statSync(p).size };
+      const total = fs.readdirSync(p).reduce((sum, file) => {
+        const item = path.join(p, file);
+        return sum + (fs.statSync(item).isFile() ? fs.statSync(item).size : 0);
+      }, 0);
+      return { name: x.name, bytes: total, directory: true };
     });
   res.json({ directory: DIRS.models, models });
 });
@@ -285,6 +289,18 @@ const MODEL_CATALOG = [
     status: "Dependency",
     description: "Official mobile-oriented video VAE decoder variant referenced by the MobileI2V workflow.",
     compatibility: "A component only, not a standalone generator. The published file is PyTorch, not a ready-to-run Android/ONNX model."
+  },
+  {
+    id: "qwen2-05b",
+    name: "Qwen2-0.5B text encoder",
+    folder: "Qwen2-0.5B",
+    files: ["config.json", "generation_config.json", "merges.txt", "model.safetensors", "tokenizer.json", "tokenizer_config.json", "vocab.json"],
+    size: "About 1.0 GB",
+    format: "Hugging Face model folder",
+    category: "Text encoder",
+    status: "Required dependency",
+    description: "Official Qwen/Qwen2-0.5B model required by MobileI2V's published configuration.",
+    compatibility: "Downloads the complete model and tokenizer files into ~/i2v-data/models/Qwen2-0.5B. This fixes the missing dependency, but does not by itself enable Android inference."
   }
 ];
 
@@ -305,6 +321,77 @@ function publicDownload(d) {
     error: d.error || null
   };
 }
+async function downloadQwenBundle(d, model) {
+  const folder = path.join(DIRS.models, model.folder);
+  const staging = path.join(DIRS.models, "." + model.folder + "." + d.id + ".part");
+  try {
+    if (fs.existsSync(folder)) throw new Error("The Qwen2-0.5B folder already exists. It was not overwritten.");
+    fs.mkdirSync(staging, { recursive: false });
+    d.status = "downloading";
+    d.name = model.folder + "/ (7 files)";
+    for (const filename of model.files) {
+      if (d.controller.signal.aborted) throw new Error("Download cancelled.");
+      let current = new URL("https://huggingface.co/Qwen/Qwen2-0.5B/resolve/main/" + filename);
+      let response;
+      for (let redirects = 0; redirects <= 8; redirects++) {
+        if (current.protocol !== "https:" || !allowedDownloadHost(current.hostname)) throw new Error("Blocked unsafe model download host.");
+        response = await fetch(current, { redirect: "manual", signal: d.controller.signal });
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+          const location = response.headers.get("location");
+          if (!location) throw new Error("Hugging Face redirected without a location.");
+          current = new URL(location, current);
+          continue;
+        }
+        break;
+      }
+      if (!response || !response.ok) throw new Error(filename + " download failed: HTTP " + (response ? response.status : "redirect limit"));
+      const length = Number(response.headers.get("content-length") || 0);
+      if (Number.isFinite(length) && length > 0) d.total += length;
+      const destination = path.join(staging, filename);
+      const temp = destination + ".part";
+      const output = fs.createWriteStream(temp, { flags: "wx" });
+      let fileBytes = 0;
+      try {
+        for await (const chunk of response.body) {
+          if (d.controller.signal.aborted) throw new Error("Download cancelled.");
+          fileBytes += chunk.length;
+          d.bytes += chunk.length;
+          if (!output.write(chunk)) await new Promise((resolve, reject) => {
+            output.once("drain", resolve);
+            output.once("error", reject);
+          });
+        }
+        await new Promise((resolve, reject) => output.end(err => err ? reject(err) : resolve()));
+        if (length && fileBytes !== length) throw new Error(filename + " was incomplete: expected " + length + " bytes, received " + fileBytes + ".");
+        fs.renameSync(temp, destination);
+      } catch (error) {
+        output.destroy();
+        try { fs.rmSync(temp, { force: true }); } catch {}
+        throw error;
+      }
+    }
+    const config = JSON.parse(fs.readFileSync(path.join(staging, "config.json"), "utf8"));
+    if (config.model_type !== "qwen2" || !fs.existsSync(path.join(staging, "model.safetensors")) ||
+        fs.statSync(path.join(staging, "model.safetensors")).size < 900 * 1024 * 1024) {
+      throw new Error("Downloaded Qwen files failed validation. The incomplete folder was discarded.");
+    }
+    for (const filename of ["tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt"]) {
+      if (!fs.existsSync(path.join(staging, filename)) || fs.statSync(path.join(staging, filename)).size === 0) {
+        throw new Error("Qwen tokenizer validation failed: " + filename + " is missing or empty.");
+      }
+    }
+    if (fs.existsSync(folder)) throw new Error("Qwen2-0.5B appeared during download. Existing folder was preserved.");
+    fs.renameSync(staging, folder);
+    d.status = "completed";
+    d.completedAt = Date.now();
+    d.name = model.folder;
+  } catch (error) {
+    try { fs.rmSync(staging, { recursive: true, force: true }); } catch {}
+    d.status = d.controller.signal.aborted ? "cancelled" : "failed";
+    d.error = error.message || "Qwen model download failed.";
+  }
+}
+
 async function downloadModel(d) {
   let current = new URL(d.url);
   try {
@@ -362,6 +449,19 @@ app.get("/api/catalog", (_req, res) => {
 app.post("/api/catalog/:id/download", (req, res) => {
   const model = MODEL_CATALOG.find(item => item.id === req.params.id);
   if (!model) return res.status(404).json({ error: "Catalog model not found." });
+  if (model.folder) {
+    const target = path.join(DIRS.models, model.folder);
+    if (fs.existsSync(target)) return res.status(409).json({ error: "The Qwen2-0.5B folder already exists on this device." });
+    if ([...activeDownloads.values()].some(d => d.name.startsWith(model.folder) && ["queued", "downloading"].includes(d.status))) {
+      return res.status(409).json({ error: "Qwen2-0.5B is already downloading." });
+    }
+    const d = { id: crypto.randomUUID(), name: model.folder, status: "queued", bytes: 0, total: 0,
+      startedAt: Date.now(), controller: new AbortController(), error: null };
+    activeDownloads.set(d.id, d);
+    res.status(202).json(publicDownload(d));
+    downloadQwenBundle(d, model);
+    return;
+  }
   const name = safeModelName(model.file);
   if (fs.existsSync(path.join(DIRS.models, name))) {
     return res.status(409).json({ error: "This model file is already stored on the device." });
@@ -424,8 +524,11 @@ app.delete("/api/models/:name", (req, res) => {
   const name = safeModelName(req.params.name);
   if (!name) return res.status(400).json({ error: "Invalid model filename." });
   const file = path.join(DIRS.models, name);
-  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return res.status(404).json({ error: "Model not found." });
-  fs.unlinkSync(file);
+  if (!fs.existsSync(file)) return res.status(404).json({ error: "Model not found." });
+  const stat = fs.statSync(file);
+  if (stat.isDirectory() && name !== "Qwen2-0.5B") return res.status(400).json({ error: "Only known model folders can be deleted." });
+  if (stat.isDirectory()) fs.rmSync(file, { recursive: true, force: true });
+  else fs.unlinkSync(file);
   res.json({ ok: true, deleted: name });
 });
 
