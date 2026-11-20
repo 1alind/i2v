@@ -106,6 +106,7 @@ for (const dir of Object.values(DIRS)) fs.mkdirSync(dir, { recursive: true });
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(ROOT, "public"), { extensions: ["html"] }));
+app.use("/outputs", express.static(DIRS.outputs, { fallthrough: true, index: false }));
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, DIRS.uploads),
