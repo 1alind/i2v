@@ -5,9 +5,10 @@ const multer = require("multer");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const os = require("node:os");
 
 const app = express();
-const HOST = "127.0.0.1";
+const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 9999);
 const ROOT = path.resolve(__dirname);
 const DATA = path.resolve(process.env.I2V_DATA_DIR || path.join(process.env.HOME || ROOT, "i2v-data"));
