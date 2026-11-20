@@ -87,3 +87,5 @@ footer span{color:var(--accent)}
 .setup-report{max-height:330px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#101319;border:1px solid var(--line);border-radius:11px;padding:12px;color:#cbd2dc;font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;margin:0}
 #modelManager>.section-title{flex-wrap:wrap}
 #modelManager>.section-title button{margin-left:auto}
+
+.tabs{display:flex;gap:8px;margin:-8px 0 16px}.tabs a{color:var(--muted);text-decoration:none;padding:9px 13px;border:1px solid var(--line);border-radius:12px;font-size:13px}.tabs a.active{color:var(--text);border-color:var(--accent);background:#a8edc212}.report-actions{display:flex;gap:8px;margin-left:auto}.section-title .report-actions{margin-left:auto}
