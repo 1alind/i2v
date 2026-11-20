@@ -72,6 +72,17 @@ function inspectCompanionModels(modelsDir) {
   const qwenReady = qwenDir && missingQwenFiles.length === 0 && qwenConfigValid &&
     fs.statSync(path.join(qwen, "model.safetensors")).size > 900 * 1024 * 1024;
   const vae = path.join(modelsDir, "video-vae");
+  const vaeConfig = path.join(vae, "config.json");
+  const vaeWeights = path.join(vae, "diffusion_pytorch_model.safetensors");
+  let vaeConfigValid = false;
+  try {
+    const config = JSON.parse(fs.readFileSync(vaeConfig, "utf8"));
+    vaeConfigValid = config._class_name === "AutoencoderKLLTXVideo" && config.latent_channels === 128;
+  } catch {}
+  let vaeWeightBytes = 0;
+  try { vaeWeightBytes = fs.statSync(vaeWeights).size; } catch {}
+  const vaeReady = fs.existsSync(vae) && fs.statSync(vae).isDirectory() && vaeConfigValid &&
+    vaeWeightBytes >= 1.5 * 1024 * 1024 * 1024;
   return [
     { id: "qwen", label: "Qwen2-0.5B text encoder",
       status: qwenReady ? "pass" : qwenDir ? "fail" : "missing",
@@ -79,8 +90,10 @@ function inspectCompanionModels(modelsDir) {
         qwenDir ? "Qwen folder is incomplete or invalid. Missing/empty: " + (missingQwenFiles.join(", ") || "valid Qwen2 config or full model.safetensors") :
         "Missing. Use Model Manager to download the official Qwen/Qwen2-0.5B bundle into models/Qwen2-0.5B." },
     { id: "vae", label: "Video VAE",
-      status: fs.existsSync(vae) && fs.statSync(vae).isDirectory() ? "pass" : "missing",
-      detail: fs.existsSync(vae) ? "Directory found." : "Missing. The official MobileI2V config references ./model/video-vae." }
+      status: vaeReady ? "pass" : fs.existsSync(vae) ? "fail" : "missing",
+      detail: vaeReady ? "Complete LTX Video VAE encoder config and weights detected." :
+        fs.existsSync(vae) ? "video-vae folder is incomplete or invalid. Expected config.json for AutoencoderKLLTXVideo and diffusion_pytorch_model.safetensors (at least 1.5 GiB)." :
+        "Missing. Use Model Manager to download the official Lightricks/LTX-Video VAE bundle into models/video-vae." }
   ];
 }
 
