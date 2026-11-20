@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111318">
+  <title>Termux I2V</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <div class="mark">I2V</div>
+      <div><h1>Image to Video</h1><p>Local Android workspace</p></div>
+      <span id="serverState" class="state">Connecting…</span>
+    </header>
+
+    <section class="panel">
+      <div class="section-title"><span>01</span><div><h2>Source image</h2><p>Choose a JPG, PNG, or WebP image</p></div></div>
+      <label class="drop" for="imageInput" id="dropArea">
+        <img id="preview" alt="Selected image preview" hidden>
+        <span id="dropText"><b>＋</b><strong>Select an image</strong><small>Maximum 15 MB</small></span>
+      </label>
+      <input id="imageInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+      <div id="uploadStatus" class="hint">No image selected</div>
+    </section>
+
+    <section class="panel">
+      <div class="section-title"><span>02</span><div><h2>Motion prompt</h2><p>Describe how the image should move</p></div></div>
+      <textarea id="prompt" maxlength="1000" placeholder="Example: The camera slowly pushes forward while the subject gently turns toward the camera…"></textarea>
+      <div class="controls">
+        <label>Frames
+          <select id="frames"><option>8</option><option selected>16</option><option>24</option><option>32</option></select>
+        </label>
+        <button id="generate" disabled>Generate video <span>↗</span></button>
+      </div>
+      <div id="jobStatus" class="notice">Inference engine not detected yet.</div>
+    </section>
+
+    <section class="panel compact">
+      <div class="section-title"><span>03</span><div><h2>Device status</h2><p>Local server and storage</p></div></div>
+      <div class="stats">
+        <div><small>Server</small><b id="serverValue">Checking</b></div>
+        <div><small>Inference</small><b id="engineValue">Not installed</b></div>
+        <div><small>Model files</small><b id="modelValue">Checking</b></div>
+      </div>
+      <p class="footnote">This interface runs locally. It does not use WebGPU or upload your image to a cloud service.</p>
+    </section>
+    <footer>TERMUX I2V <span>•</span> 127.0.0.1:9999</footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
