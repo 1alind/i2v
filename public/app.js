@@ -55,14 +55,34 @@ $("imageInput").addEventListener("change", async event => {
 $("generate").addEventListener("click", async () => {
   if (!uploadedImageId) return;
   $("generate").disabled = true;
-  $("jobStatus").textContent = "Checking local inference backend…";
+  $("jobStatus").textContent = "Starting official MobileI2V inference…";
   try {
     const {response,data} = await api("/api/jobs", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({imageId:uploadedImageId,prompt:$("prompt").value,frames:Number($("frames").value)})
+      body:JSON.stringify({imageId:uploadedImageId,prompt:$("prompt").value,frames:17})
     });
-    $("jobStatus").textContent = data.error || (response.ok ? "Job started." : "Backend unavailable.");
+    if (!response.ok) throw new Error(data.error || "Could not start generation.");
+    const jobId = data.job.id;
+    let finished = false;
+    while (!finished) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const result = await api("/api/jobs/" + encodeURIComponent(jobId));
+      const job = result.data;
+      $("jobStatus").textContent = (job.progress ? job.progress + "% · " : "") + (job.message || job.status);
+      if (job.status === "completed") {
+        const link = document.createElement("a");
+        link.href = job.output;
+        link.textContent = "Open generated video";
+        link.target = "_blank";
+        link.rel = "noopener";
+        $("jobStatus").replaceChildren(document.createTextNode("Generation complete · "), link);
+        finished = true;
+      } else if (job.status === "failed") {
+        $("jobStatus").textContent = job.message + (job.error ? " · " + job.error : "");
+        finished = true;
+      }
+    }
   } catch (error) {
     $("jobStatus").textContent = error.message;
   } finally {
