@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""Run the upstream MobileI2V pipeline against files in the persistent i2v data dir.
+
+This deliberately uses the official model implementation. It does not export guessed
+ONNX graphs or synthesize placeholder videos.
+"""
+import argparse
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import traceback
+
+UPSTREAM = "https://github.com/hustvl/MobileI2V.git"
+
+def emit(kind, **fields):
+    print(json.dumps({"event": kind, **fields}), flush=True)
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--data", required=True)
+    p.add_argument("--image", required=True)
+    p.add_argument("--prompt", default="")
+    p.add_argument("--job", required=True)
+    args = p.parse_args()
+
+    data = Path(args.data).resolve()
+    image = Path(args.image).resolve()
+    models = data / "models"
+    runtime = data / "runtime"
+    repo = runtime / "MobileI2V"
+    output = data / "outputs" / args.job
+    output.mkdir(parents=True, exist_ok=True)
+
+    if not image.is_file():
+        raise RuntimeError("Uploaded input image does not exist.")
+    checkpoint = models / "hybrid_371.pth"
+    qwen = models / "Qwen2-0.5B"
+    vae = models / "video-vae"
+    for path, label in [(checkpoint, "MobileI2V checkpoint"), (qwen, "Qwen2-0.5B text encoder"), (vae, "LTX Video VAE")]:
+        if not path.exists():
+            raise RuntimeError(f"Missing {label}: {path}")
+
+    runtime.mkdir(parents=True, exist_ok=True)
+    if not repo.exists():
+        emit("progress", message="Fetching the official HUST MobileI2V source…")
+        subprocess.run(["git", "clone", "--depth", "1", UPSTREAM, str(repo)], check=True)
+    elif not (repo / "scripts" / "inference_i2v.py").is_file():
+        raise RuntimeError("The cached MobileI2V source folder is incomplete. Remove i2v-data/runtime/MobileI2V and retry.")
+
+    required = ["torch", "torchvision", "PIL", "yaml", "pyrallis", "einops", "cv2", "transformers", "diffusers", "timm", "safetensors"]
+    missing = [name for name in required if importlib.util.find_spec(name) is None]
+    if missing:
+        raise RuntimeError("Official MobileI2V Python dependencies are missing: " + ", ".join(missing) +
+                           ". This Termux build will not install the upstream CUDA-pinned requirements.txt.")
+
+    import torch
+    if torch.cuda.is_available():
+        device_mode = "cuda"
+    else:
+        device_mode = "cpu"
+    emit("progress", message=f"Preparing official MobileI2V inference on {device_mode.upper()}.")
+
+    # Work on a private copy so upstream files remain untouched.
+    work = runtime / ("run-" + args.job)
+    if work.exists():
+        shutil.rmtree(work)
+    shutil.copytree(repo, work, ignore=shutil.ignore_patterns(".git", "output", "test_video"))
+    script = work / "scripts" / "inference_i2v.py"
+    source = script.read_text()
+    source = source.replace("z = z.half()", "z = z.to(dtype=weight_dtype)")
+    source = source.replace("ref_image = ref_image.half()", "ref_image = ref_image.to(dtype=weight_dtype)")
+    source = source.replace("        torch.cuda.empty_cache()", "        if torch.cuda.is_available():\n            torch.cuda.empty_cache()")
+    script.write_text(source)
+
+    config_path = work / "configs" / "mobilei2v_config" / "MobileI2V_300M_img512.yaml"
+    import yaml
+    config = yaml.safe_load(config_path.read_text())
+    config["txt_file"] = str(work / "asset" / ("input-" + args.job + ".txt"))
+    config["model_path"] = str(checkpoint)
+    config["save_path"] = str(output)
+    config["prompt"] = args.prompt or "Animate the scene naturally with subtle realistic motion."
+    config["flow_score"] = 2.0
+    config["vae"]["vae_pretrained"] = str(vae)
+    config["text_encoder"]["text_encoder_name"] = str(qwen)
+    if device_mode == "cpu":
+        config["model"]["mixed_precision"] = "fp32"
+        config["vae"]["weight_dtype"] = "fp32"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False))
+    input_list = work / "asset" / ("input-" + args.job + ".txt")
+    input_list.parent.mkdir(parents=True, exist_ok=True)
+    input_list.write_text(str(image) + "\n")
+
+    emit("progress", message="Loading Qwen, LTX VAE and MobileI2V weights. First run may take several minutes.")
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    command = [sys.executable, str(script), "--config", str(config_path)]
+    process = subprocess.Popen(command, cwd=work, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    tail = []
+    for line in process.stdout:
+        line = line.rstrip()
+        if line:
+            tail.append(line)
+            tail = tail[-35:]
+            print(line, flush=True)
+    code = process.wait()
+    if code:
+        raise RuntimeError("Official MobileI2V inference exited with code " + str(code) + ":\n" + "\n".join(tail[-12:]))
+    videos = sorted(output.rglob("*.mp4"), key=lambda x: x.stat().st_mtime, reverse=True)
+    if not videos:
+        raise RuntimeError("The official inference script finished but produced no MP4 file.")
+    final = output / "result.mp4"
+    if videos[0] != final:
+        shutil.copy2(videos[0], final)
+    emit("complete", output=str(final), bytes=final.stat().st_size, backend=device_mode)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as exc:
+        emit("failed", error=str(exc), traceback=traceback.format_exc()[-5000:])
+        sys.exit(1)
