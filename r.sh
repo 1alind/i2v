@@ -54,6 +54,11 @@ if ! command -v pkg >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v git >/dev/null 2>&1; then
+  pkg_refresh
+  pkg_install git
+fi
+
 if ! command -v node >/dev/null 2>&1; then
   pkg_refresh
   pkg_install nodejs-lts
