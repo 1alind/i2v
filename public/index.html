@@ -66,7 +66,9 @@
         <button id="runEngineTests" class="small-button">Run tests</button>
         <button id="repairEngine" class="small-button">Safe auto-fix</button>
       </div>
-      <div id="engineTestState" class="report-state">Diagnostics have not run yet.</div>
+      <div id="engineTestState" class="report-state">Detecting device and selecting runtime…</div>
+      <div id="deviceProfile" class="device-profile">Reading Android device properties…</div>
+      <div id="backendChoice" class="backend-choice">Selecting the best available backend…</div>
       <div id="engineChecks" class="engine-checks"><div class="empty-state">Run tests to inspect the inference setup.</div></div>
       <p id="engineNote" class="footnote">Safe auto-fix only repairs storage folders and removes stale partial downloads. It never deletes completed model files or installs incompatible runtimes.</p>
     </section>
