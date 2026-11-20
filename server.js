@@ -82,11 +82,13 @@ app.get("/api/models", (_req, res) => {
 });
 
 
-const DOWNLOAD_HOSTS = new Set([
-  "huggingface.co", "www.huggingface.co", "hf.co",
-  "cdn-lfs.huggingface.co", "cas-bridge.xethub.hf.co",
-  "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"
-]);
+function allowedDownloadHost(host) {
+  host = host.toLowerCase();
+  return host === "huggingface.co" || host.endsWith(".huggingface.co") ||
+    host === "hf.co" || host.endsWith(".hf.co") ||
+    host === "github.com" || host.endsWith(".github.com") ||
+    host === "githubusercontent.com" || host.endsWith(".githubusercontent.com");
+}
 const activeDownloads = new Map();
 
 function safeModelName(input) {
@@ -111,7 +113,7 @@ async function downloadModel(d) {
   try {
     let response;
     for (let redirects = 0; redirects <= 8; redirects++) {
-      if (current.protocol !== "https:" || !DOWNLOAD_HOSTS.has(current.hostname.toLowerCase())) {
+      if (current.protocol !== "https:" || !allowedDownloadHost(current.hostname)) {
         throw new Error("Only HTTPS downloads from Hugging Face or GitHub are allowed.");
       }
       response = await fetch(current, { redirect: "manual", signal: d.controller.signal });
@@ -164,7 +166,7 @@ app.post("/api/downloads", (req, res) => {
   const url = typeof req.body?.url === "string" ? req.body.url.trim() : "";
   let parsed;
   try { parsed = new URL(url); } catch { return res.status(400).json({ error: "Enter a valid HTTPS model file URL." }); }
-  if (parsed.protocol !== "https:" || !DOWNLOAD_HOSTS.has(parsed.hostname.toLowerCase())) {
+  if (parsed.protocol !== "https:" || !allowedDownloadHost(parsed.hostname)) {
     return res.status(400).json({ error: "Allowed sources: Hugging Face and GitHub HTTPS file links." });
   }
   const inferred = decodeURIComponent(parsed.pathname.split("/").pop() || "");
