@@ -42,6 +42,25 @@ test("report identifies missing companion models and CUDA blocker", () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test("Qwen text encoder is only ready when its complete model bundle is present", () => {
+  const root = tempDir();
+  const models = path.join(root, "models");
+  const qwen = path.join(models, "Qwen2-0.5B");
+  fs.mkdirSync(qwen, { recursive: true });
+  fs.writeFileSync(path.join(qwen, "config.json"), JSON.stringify({ model_type: "qwen2" }));
+  for (const file of ["tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt"]) {
+    fs.writeFileSync(path.join(qwen, file), "ok");
+  }
+  let report = buildReport({ dataDir: root });
+  assert.equal(report.checks.find(x => x.id === "qwen").status, "fail");
+  const fd = fs.openSync(path.join(qwen, "model.safetensors"), "w");
+  fs.ftruncateSync(fd, 901 * 1024 * 1024);
+  fs.closeSync(fd);
+  report = buildReport({ dataDir: root });
+  assert.equal(report.checks.find(x => x.id === "qwen").status, "pass");
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test("report exposes ONNX provider availability without claiming hardware support", () => {
   const root = tempDir();
   fs.mkdirSync(path.join(root, "models"));
