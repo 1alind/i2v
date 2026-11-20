@@ -9,6 +9,7 @@ const os = require("node:os");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const execFileAsync = promisify(execFile);
+const { buildReport, repairStorage } = require("./engine/doctor");
 
 const app = express();
 const HOST = process.env.HOST || "0.0.0.0";
@@ -139,6 +140,61 @@ app.get("/api/version", (_req, res) => {
 app.get("/api/updates/log", (_req, res) => {
   const file = path.join(DIRS.logs, "updates.log");
   res.type("text").send(fs.existsSync(file) ? fs.readFileSync(file, "utf8").split(/\r?\n/).slice(-100).join("\n") : "No update activity yet.");
+});
+
+async function probeEngineRuntime() {
+  const runtime = { python: null, torch: null, cuda: false, onnx: null, ffmpeg: false };
+  try {
+    const script = [
+      "import importlib.util, json",
+      "out = {'python': __import__('sys').version.split()[0], 'torch': None, 'cuda': False, 'onnx': None}",
+      "if importlib.util.find_spec('torch'):",
+      " import torch",
+      " out['torch'] = torch.__version__",
+      " out['cuda'] = bool(torch.cuda.is_available())",
+      "if importlib.util.find_spec('onnxruntime'):",
+      " import onnxruntime as ort",
+      " out['onnx'] = ort.__version__",
+      "print(json.dumps(out))"
+    ].join("\\n");
+    const { stdout } = await execFileAsync("python3", ["-c", script], { timeout: 45000, maxBuffer: 1024 * 1024 });
+    Object.assign(runtime, JSON.parse(stdout.trim()));
+  } catch {}
+  try {
+    await execFileAsync("ffmpeg", ["-version"], { timeout: 5000, maxBuffer: 256 * 1024 });
+    runtime.ffmpeg = true;
+  } catch {}
+  return runtime;
+}
+
+app.get("/api/engine/diagnostics", async (_req, res) => {
+  try {
+    const runtime = await probeEngineRuntime();
+    const report = buildReport({
+      dataDir: DATA,
+      runtime,
+      memory: { free: os.freemem(), total: os.totalmem() }
+    });
+    res.set("Cache-Control", "no-store");
+    res.json(report);
+  } catch (error) {
+    res.status(500).json({ error: "Engine diagnostics failed: " + (error.message || String(error)) });
+  }
+});
+
+app.post("/api/engine/repair", async (_req, res) => {
+  try {
+    const result = await repairStorage(DATA);
+    const runtime = await probeEngineRuntime();
+    const report = buildReport({
+      dataDir: DATA,
+      runtime,
+      memory: { free: os.freemem(), total: os.totalmem() }
+    });
+    res.json({ ...result, report });
+  } catch (error) {
+    res.status(500).json({ error: "Safe repair failed: " + (error.message || String(error)) });
+  }
 });
 
 app.get("/api/health", (_req, res) => {
