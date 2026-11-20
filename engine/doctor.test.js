@@ -38,6 +38,15 @@ test("report identifies missing companion models and CUDA blocker", () => {
   assert.equal(report.checks.find(x => x.id === "qwen").status, "missing");
   assert.equal(report.checks.find(x => x.id === "vae").status, "missing");
   assert.equal(report.checks.find(x => x.id === "cuda").status, "blocked");
+  const androidReport = buildReport({
+    dataDir: root,
+    runtime: { cuda: false, onnx: "1.32.0", onnxProviders: ["NnapiExecutionProvider", "CPUExecutionProvider"] },
+    device: { android: true, model: "SM-A528B" }
+  });
+  assert.equal(androidReport.checks.find(x => x.id === "cuda").status, "not-applicable");
+  assert.match(androidReport.checks.find(x => x.id === "cuda").detail, /Not applicable on Android/);
+  assert.equal(androidReport.backend.id, "onnx-nnapi");
+  assert.equal(androidReport.summary.includes("CUDA"), false);
   assert.equal(report.ready, false);
   fs.rmSync(root, { recursive: true, force: true });
 });
