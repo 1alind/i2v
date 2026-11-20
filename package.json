@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "check": "bash -n r.sh && bash -n manage.sh && node --check server.js && node --check engine/doctor.js && node --check engine/device.js && node --test engine/doctor.test.js"
+    "check": "bash -n r.sh && bash -n manage.sh && node --check server.js && node --check engine/doctor.js && node --check engine/device.js && node --test engine/doctor.test.js && python3 -m py_compile engine/mobilei2v_runner.py"
   },
   "engines": {
     "node": ">=20"
