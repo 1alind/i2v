@@ -26,7 +26,7 @@ npm install
 npm start
 ```
 
-Open http://127.0.0.1:9999 in the phone browser.
+Open http://127.0.0.1:9999 on the phone. The startup log also prints a `Same-Wi-Fi URL` such as `http://192.168.1.23:9999`; open that address on another device connected to the same Wi-Fi.
 
 ## Data locations
 
@@ -56,4 +56,4 @@ The target is local CPU inference with optional Android accelerator support when
 
 ## Security
 
-The server binds to 127.0.0.1 only. It does not expose the API to Wi-Fi or the public internet.
+The server listens on all network interfaces (`0.0.0.0`) so devices on the same Wi-Fi can connect. There is currently no login or password. Only use it on a trusted private Wi-Fi network, and stop the server when finished. Do not expose port 9999 to the internet or configure router port forwarding.
