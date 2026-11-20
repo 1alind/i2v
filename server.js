@@ -16,6 +16,7 @@ const PORT = Number(process.env.PORT || 9999);
 const ROOT = path.resolve(__dirname);
 const UPDATE_INTERVAL_MS = 60 * 1000;
 let updateCheckRunning = false;
+let dependencyRepairNeeded = false;
 let updateState = { status: "checking", current: null, latest: null, checkedAt: null, message: "Waiting for first update check." };
 function logUpdate(message) {
   const line = "[" + new Date().toISOString() + "] " + message + "\n";
@@ -37,6 +38,16 @@ async function checkForUpdates() {
     await gitOutput(["fetch", "--quiet", "origin", branch]);
     const latest = await gitOutput(["rev-parse", "origin/" + branch]);
     if (latest === current) {
+      if (dependencyRepairNeeded) {
+        updateState = { status: "updating", current, latest, checkedAt: new Date().toISOString(), message: "Retrying dependency installation after an earlier failure." };
+        logUpdate(updateState.message);
+        await execFileAsync("npm", ["install", "--no-audit", "--no-fund", "--fetch-retries=5", "--fetch-timeout=180000", "--registry=https://registry.npmjs.org/"], { cwd: ROOT, timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+        dependencyRepairNeeded = false;
+        updateState = { status: "restarting", current, latest, checkedAt: new Date().toISOString(), message: "Dependencies repaired. Restarting server now." };
+        logUpdate(updateState.message);
+        setTimeout(() => process.exit(75), 500);
+        return;
+      }
       updateState = { status: "current", current, latest, checkedAt: new Date().toISOString(), message: "App is up to date." };
       return;
     }
@@ -55,9 +66,11 @@ async function checkForUpdates() {
     const changed = await gitOutput(["diff", "--name-only", current, latest]);
     await gitOutput(["merge", "--ff-only", "origin/" + branch]);
     if (changed.split("\n").some(file => ["package.json", "package-lock.json"].includes(file))) {
+      dependencyRepairNeeded = true;
       updateState.message = "Project updated. Installing updated dependencies before restart.";
       logUpdate(updateState.message);
-      await execFileAsync("npm", ["install", "--no-audit", "--no-fund", "--fetch-retries=3", "--fetch-timeout=120000"], { cwd: ROOT, timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+      await execFileAsync("npm", ["install", "--no-audit", "--no-fund", "--fetch-retries=5", "--fetch-timeout=180000", "--registry=https://registry.npmjs.org/"], { cwd: ROOT, timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+      dependencyRepairNeeded = false;
     }
     updateState = { status: "restarting", current: latest, latest, checkedAt: new Date().toISOString(), message: "Update installed. Restarting server now." };
     logUpdate("Update installed successfully. Restarting server.");
