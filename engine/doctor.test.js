@@ -34,6 +34,21 @@ test("report identifies missing companion models and CUDA blocker", () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test("report exposes ONNX provider availability without claiming hardware support", () => {
+  const root = tempDir();
+  fs.mkdirSync(path.join(root, "models"));
+  const report = buildReport({
+    dataDir: root,
+    runtime: { onnx: "1.32.0", onnxProviders: ["CPUExecutionProvider", "QNNExecutionProvider"] },
+    memory: {}
+  });
+  const check = report.checks.find(x => x.id === "onnx-backends");
+  assert.equal(check.status, "warn");
+  assert.match(check.detail, /QNNExecutionProvider/);
+  assert.match(check.detail, /does not prove/);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test("safe repair creates storage folders and removes only stale partial files", async () => {
   const root = tempDir();
   const models = path.join(root, "models");
