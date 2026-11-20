@@ -124,4 +124,17 @@ done
 say "All dependencies and startup checks passed."
 say "Setup log: $LOG"
 say "Starting local I2V server on http://127.0.0.1:9999"
-exec npm start
+while true; do
+  say "Launching I2V server..."
+  set +e
+  npm start
+  SERVER_EXIT=$?
+  set -e
+  if [ "$SERVER_EXIT" -eq 75 ]; then
+    say "Automatic update requested a restart. Relaunching without rerunning setup..."
+    sleep 1
+    continue
+  fi
+  say "Server stopped with exit code $SERVER_EXIT."
+  exit "$SERVER_EXIT"
+done
