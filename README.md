@@ -17,15 +17,14 @@ This repository provides the local web UI, Node.js API, image upload handling, j
 ## Install
 
 ```bash
-pkg update && pkg upgrade
-pkg install nodejs-lts git
-termux-setup-storage
+pkg update
+pkg install git
 git clone https://github.com/1alind/i2v.git
 cd i2v
-npm install
-npm start
+bash r.sh
 ```
 
+**Automatic setup:** run `bash r.sh` for both first install and every later launch. It checks Node.js/npm versions, installs missing Termux packages, installs or repairs the project's npm dependencies, verifies that Express and Multer actually load, checks JavaScript syntax and writable storage, then starts the server. If npm installation fails, it verifies the npm cache, detects native compiler errors and installs build tools only when needed, then retries using the official npm registry. It keeps a persistent setup log at `~/i2v-data/logs/setup.log`. It does not delete model files or uploads.
 Open http://127.0.0.1:9999 on the phone. The startup log also prints a `Same-Wi-Fi URL` such as `http://192.168.1.23:9999`; open that address on another device connected to the same Wi-Fi.
 
 ## Data locations
