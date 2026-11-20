@@ -84,7 +84,7 @@ footer span{color:var(--accent)}
 .report-state.passed{background:#20372b;color:#a8edc2}
 .report-state.failed{background:#3b2428;color:#ffb4bb}
 .report-state.running{background:#352d20;color:#f4c77b}
-.setup-report{max-height:330px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#101319;border:1px solid var(--line);border-radius:11px;padding:12px;color:#cbd2dc;font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;margin:0}
+.setup-report{max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#101319;border:1px solid var(--line);border-radius:11px;padding:12px;color:#cbd2dc;font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;margin:0}
 #modelManager>.section-title{flex-wrap:wrap}
 #modelManager>.section-title button{margin-left:auto}
 
