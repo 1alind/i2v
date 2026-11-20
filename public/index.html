@@ -18,6 +18,10 @@
     <nav class="tabs"><a href="#studio">Studio</a><a href="#modelManager" class="active">Model manager</a></nav>
 
     <section class="panel model-panel" id="modelManager">
+      <div class="section-title"><span>00</span><div><h2>System setup report</h2><p>Automatic dependency checks, repairs and errors</p></div><button id="refreshSetupReport" class="small-button">Refresh</button></div>
+      <div id="setupReportState" class="report-state">Checking setup report…</div>
+      <pre id="setupReport" class="setup-report">Waiting for setup report…</pre>
+      <p id="setupReportTime" class="footnote"></p>
       <div class="section-title"><span>01</span><div><h2>Model manager</h2><p>Download model files directly to this device</p></div></div>
       <div class="catalog-heading"><div><h3>Model catalog</h3><p>Curated downloads from the original model publishers</p></div><button id="refreshCatalog" class="small-button">Refresh</button></div>
       <div id="catalogList" class="catalog-list"><div class="empty-state">Loading model catalog…</div></div>
