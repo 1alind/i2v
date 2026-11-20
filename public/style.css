@@ -102,3 +102,5 @@ footer span{color:var(--accent)}
 .engine-check.pass .engine-check-heading span{color:var(--accent)}
 .engine-check.missing .engine-check-heading span,.engine-check.fail .engine-check-heading span,.engine-check.blocked .engine-check-heading span{color:#ffb4bb}
 .engine-check.warn .engine-check-heading span{color:var(--warn)}
+
+.device-profile,.backend-choice{background:#13161c;border:1px solid var(--line);border-radius:11px;padding:11px;margin:0 0 9px;font-size:11px;line-height:1.6;overflow-wrap:anywhere}.device-profile{color:var(--text)}.backend-choice{color:var(--accent)}
