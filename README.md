@@ -27,6 +27,12 @@ bash r.sh
 **Automatic setup:** run `bash r.sh` for both first install and every later launch. It checks Node.js/npm versions, installs missing Termux packages, installs or repairs the project's npm dependencies, verifies that Express and Multer actually load, checks JavaScript syntax and writable storage, then starts the server. If npm installation fails, it verifies the npm cache, detects native compiler errors and installs build tools only when needed, then retries using the official npm registry. It keeps a persistent setup log at `~/i2v-data/logs/setup.log`. It does not delete model files or uploads.
 Open http://127.0.0.1:9999 on the phone. The startup log also prints a `Same-Wi-Fi URL` such as `http://192.168.1.23:9999`; open that address on another device connected to the same Wi-Fi.
 
+## Automatic updates
+
+When launched with `bash r.sh`, the server checks the GitHub branch every 60 seconds. If a new commit is available, it waits for active model downloads to finish, refuses to overwrite local source edits, fast-forward updates the project, reinstalls npm dependencies if package files changed, and requests a controlled server restart. The `r.sh` supervisor starts the server again. The open website detects the restart/version change and reloads itself. Update activity is written to `~/i2v-data/logs/updates.log`.
+
+The phone must have internet access and Git installed. Automatic restart works when started through `bash r.sh`, not when running `node server.js` directly. If local source edits are detected, the updater pauses rather than overwriting them.
+
 ## Data locations
 
 By default, files are stored in `~/i2v-data`:
