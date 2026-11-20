@@ -120,7 +120,7 @@ async function repairStorage(dataDir, options = {}) {
     if (!name.startsWith(".") || !name.endsWith(".part")) continue;
     const file = path.join(modelsDir, name);
     const stat = fs.statSync(file);
-    if (stat.isFile() && now - stat.mtimeMs > staleAfterMs) {
+    if (stat.isFile() && !(options.activePartNames || []).includes(name) && now - stat.mtimeMs > staleAfterMs) {
       fs.unlinkSync(file);
       repaired.push("Removed stale partial download: " + name);
     }
