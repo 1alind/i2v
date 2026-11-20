@@ -15,17 +15,18 @@ async function refreshStatus() {
     ]);
     $("serverState").textContent = "Local server online";
     $("serverState").style.color = "var(--accent)";
-    $("serverValue").textContent = "Online";
-    $("engineValue").textContent = health.inference.available ? "Ready" : "Not installed";
-    $("modelValue").textContent = models.models.length + " file(s)";
-    $("jobStatus").textContent = health.inference.reason || "Inference engine ready.";
+    if ($("serverValue")) $("serverValue").textContent = "Online";
+    if ($("engineValue")) $("engineValue").textContent = health.inference.available ? "Ready" : "Not installed";
+    if ($("modelValue")) $("modelValue").textContent = models.models.length + " file(s)";
+    if ($("jobStatus")) $("jobStatus").textContent = health.inference.reason || "Inference engine ready.";
   } catch (error) {
     $("serverState").textContent = "Offline";
-    $("serverValue").textContent = "Offline";
-    $("jobStatus").textContent = error.message;
+    if ($("serverValue")) $("serverValue").textContent = "Offline";
+    if ($("jobStatus")) $("jobStatus").textContent = error.message;
   }
 }
 
+if ($("imageInput")) {
 $("imageInput").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
@@ -69,7 +70,9 @@ $("generate").addEventListener("click", async () => {
   }
 });
 
-refreshStatus();
+}
+
+if ($("serverValue")) refreshStatus();
 
 async function refreshSetupReport() {
   const state = $("setupReportState");
@@ -90,9 +93,20 @@ async function refreshSetupReport() {
     output.textContent = error.message;
   }
 }
-$("refreshSetupReport").addEventListener("click", refreshSetupReport);
+if ($("refreshSetupReport")) $("refreshSetupReport").addEventListener("click", refreshSetupReport);
+if ($("copySetupReport")) $("copySetupReport").addEventListener("click", async () => {
+  const button = $("copySetupReport");
+  const content = $("setupReport")?.textContent || "";
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(content);
+    else { const field=document.createElement("textarea"); field.value=content; document.body.append(field); field.select(); document.execCommand("copy"); field.remove(); }
+    button.textContent = "Copied ✓";
+  } catch { button.textContent = "Copy failed"; }
+  setTimeout(() => { if (button.isConnected) button.textContent = "Copy report"; }, 1800);
+});
 
 
+if ($("catalogList")) {
 function fmtBytes(value) {
   if (!Number.isFinite(value) || value < 0) return "Unknown";
   if (value < 1024) return value.toFixed(0) + " B";
@@ -261,8 +275,9 @@ refreshModels();
 refreshDownloads();
 setInterval(refreshDownloads, 1000);
 
-refreshSetupReport();
-setInterval(refreshSetupReport, 5000);
+if ($("setupReport")) { refreshSetupReport(); setInterval(refreshSetupReport, 5000); }
+}
+
 
 let lastSeenVersion = null;
 let serverWasUnavailable = false;
