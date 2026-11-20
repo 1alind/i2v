@@ -72,7 +72,7 @@ $("generate").addEventListener("click", async () => {
 
 }
 
-if ($("serverValue")) refreshStatus();
+if ($("serverState")) refreshStatus();
 
 async function refreshSetupReport() {
   const state = $("setupReportState");
