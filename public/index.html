@@ -15,33 +15,17 @@
       <span id="serverState" class="state">Connecting…</span>
     </header>
 
-    <nav class="tabs"><a href="/">Studio</a><a href="/model-manager" class="active">Model manager</a></nav>
+    <nav class="tabs"><a href="/" class="active">Studio</a><a href="/model-manager">Model manager</a></nav>
 
-<section class="panel model-panel" id="modelManager">
-      <div class="section-title"><span>00</span><div><h2>System setup report</h2><p>Automatic dependency checks, repairs and errors</p></div><button id="refreshSetupReport" class="small-button">Refresh</button></div>
+<section class="panel">
+      <div class="section-title"><span>00</span><div><h2>System setup report</h2><p>Automatic dependency checks, repairs and errors</p></div><div class="report-actions"><button id="copySetupReport" class="small-button">Copy report</button><button id="refreshSetupReport" class="small-button">Refresh</button></div></div>
       <div id="setupReportState" class="report-state">Checking setup report…</div>
       <pre id="setupReport" class="setup-report">Waiting for setup report…</pre>
       <p id="setupReportTime" class="footnote"></p>
       <div id="updateState" class="report-state">Automatic updates: checking…</div>
       <p id="updateMessage" class="footnote">Checks GitHub once per minute. The page reloads automatically after a successful update and server restart.</p>
       <details class="manual-download"><summary>Update activity log</summary><pre id="updateLog" class="setup-report">Loading update history…</pre></details>
-      <div class="section-title"><span>01</span><div><h2>Model manager</h2><p>Download model files directly to this device</p></div></div>
-      <div class="catalog-heading"><div><h3>Model catalog</h3><p>Curated downloads from the original model publishers</p></div><button id="refreshCatalog" class="small-button">Refresh</button></div>
-      <div id="catalogList" class="catalog-list"><div class="empty-state">Loading model catalog…</div></div>
-      <details class="manual-download">
-        <summary>Advanced: download from a custom URL</summary>
-      <label class="field-label" for="modelUrl">Model file URL</label>
-      <input id="modelUrl" class="text-input" type="url" placeholder="https://huggingface.co/.../resolve/main/model.safetensors" autocomplete="url">
-      <label class="field-label" for="modelFilename">Save as <small>(optional)</small></label>
-      <input id="modelFilename" class="text-input" type="text" placeholder="Automatically use the original filename">
-      <button id="downloadModel" class="download-button">Download to device <span>↓</span></button>
-      <p class="footnote">Custom downloads support direct HTTPS files from Hugging Face and GitHub. All files are saved in ~/i2v-data/models.</p>
-      </details>
-      <p class="compat-note">Compatibility note: catalog files are original PyTorch checkpoints. They are not yet verified to run on the Snapdragon 778G through Termux. Downloading them does not enable generation by itself.</p>
-      <div id="downloadList" class="download-list"><div class="empty-state">No active downloads.</div></div>
-      <div class="model-heading"><h3>Stored models</h3><button id="refreshModels" class="small-button">Refresh</button></div>
-      <div id="modelList" class="model-list"><div class="empty-state">Loading model files…</div></div>
-    </section>
+          </section>
 
     <div id="studio">
     <section class="panel">
