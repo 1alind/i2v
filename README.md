@@ -65,3 +65,17 @@ The target is local CPU inference with optional Android accelerator support when
 ## Security
 
 The server listens on all network interfaces (`0.0.0.0`) so devices on the same Wi-Fi can connect. There is currently no login or password. Only use it on a trusted private Wi-Fi network, and stop the server when finished. Do not expose port 9999 to the internet or configure router port forwarding.
+
+## Inference diagnostics and safe repair
+
+The Studio page includes **Run tests** and **Safe auto-fix**. Diagnostics inspect the two downloaded checkpoint files, the additional Qwen2-0.5B and video-VAE directories referenced by the upstream configuration, Python/PyTorch, CUDA, ONNX Runtime, FFmpeg, and currently free memory.
+
+The automated tests run with:
+
+```bash
+npm run check
+```
+
+Safe auto-fix only recreates missing data directories and removes stale hidden `.part` download fragments older than 24 hours. It never deletes completed model files, changes checkpoint contents, or blindly installs PyTorch/ONNX packages. Generation remains disabled until a compatible inference backend and a real inference smoke test are available.
+
+**Important:** the current official MobileI2V inference script is CUDA-oriented. ONNX Runtime being installed is not proof that the original PyTorch checkpoints can be executed on this phone. The two downloaded checkpoints are not the full official model bundle; the configuration also references Qwen2-0.5B and a video-VAE directory.
