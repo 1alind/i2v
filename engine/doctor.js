@@ -59,11 +59,25 @@ function inspectModelFiles(modelsDir) {
 
 function inspectCompanionModels(modelsDir) {
   const qwen = path.join(modelsDir, "Qwen2-0.5B");
+  const qwenFiles = ["config.json", "model.safetensors", "tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt"];
+  const qwenDir = fs.existsSync(qwen) && fs.statSync(qwen).isDirectory();
+  const missingQwenFiles = qwenDir ? qwenFiles.filter(name => {
+    const file = path.join(qwen, name);
+    try { return !fs.statSync(file).isFile() || fs.statSync(file).size === 0; } catch { return true; }
+  }) : qwenFiles;
+  let qwenConfigValid = false;
+  if (qwenDir && !missingQwenFiles.includes("config.json")) {
+    try { qwenConfigValid = JSON.parse(fs.readFileSync(path.join(qwen, "config.json"), "utf8")).model_type === "qwen2"; } catch {}
+  }
+  const qwenReady = qwenDir && missingQwenFiles.length === 0 && qwenConfigValid &&
+    fs.statSync(path.join(qwen, "model.safetensors")).size > 900 * 1024 * 1024;
   const vae = path.join(modelsDir, "video-vae");
   return [
     { id: "qwen", label: "Qwen2-0.5B text encoder",
-      status: fs.existsSync(qwen) && fs.statSync(qwen).isDirectory() ? "pass" : "missing",
-      detail: fs.existsSync(qwen) ? "Directory found." : "Missing. The official MobileI2V config references ./model/Qwen2-0.5B." },
+      status: qwenReady ? "pass" : qwenDir ? "fail" : "missing",
+      detail: qwenReady ? "Complete Qwen2-0.5B model and tokenizer files detected." :
+        qwenDir ? "Qwen folder is incomplete or invalid. Missing/empty: " + (missingQwenFiles.join(", ") || "valid Qwen2 config or full model.safetensors") :
+        "Missing. Use Model Manager to download the official Qwen/Qwen2-0.5B bundle into models/Qwen2-0.5B." },
     { id: "vae", label: "Video VAE",
       status: fs.existsSync(vae) && fs.statSync(vae).isDirectory() ? "pass" : "missing",
       detail: fs.existsSync(vae) ? "Directory found." : "Missing. The official MobileI2V config references ./model/video-vae." }
