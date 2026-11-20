@@ -71,6 +71,28 @@ $("generate").addEventListener("click", async () => {
 
 refreshStatus();
 
+async function refreshSetupReport() {
+  const state = $("setupReportState");
+  const output = $("setupReport");
+  try {
+    const {data} = await api("/api/setup-report");
+    state.className = "report-state " + (data.status || "not-run");
+    state.textContent = data.status === "passed" ? "✓ Setup checks passed" :
+      data.status === "failed" ? "⚠ Setup failed · inspect the report below" :
+      data.status === "running" ? "● Setup is running or has not finished" :
+      "Setup has not run yet";
+    output.textContent = data.available ? (data.report || "The setup log is empty.") :
+      "No setup log found yet. Run bash r.sh in Termux to start automatic setup.";
+    $("setupReportTime").textContent = data.updatedAt ? "Last log update: " + new Date(data.updatedAt).toLocaleString() : "";
+  } catch (error) {
+    state.className = "report-state failed";
+    state.textContent = "Could not load setup report";
+    output.textContent = error.message;
+  }
+}
+$("refreshSetupReport").addEventListener("click", refreshSetupReport);
+
+
 function fmtBytes(value) {
   if (!Number.isFinite(value) || value < 0) return "Unknown";
   if (value < 1024) return value.toFixed(0) + " B";
@@ -238,3 +260,6 @@ refreshCatalog();
 refreshModels();
 refreshDownloads();
 setInterval(refreshDownloads, 1000);
+
+refreshSetupReport();
+setInterval(refreshSetupReport, 5000);
