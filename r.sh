@@ -29,7 +29,7 @@ trap fail ERR
 
 pkg_refresh() {
   say "Refreshing Termux package lists..."
-  if ! pkg update -y; then
+  if ! pkg update; then
     say "Package-list refresh failed. Trying Termux's configured apt repair once..."
     apt-get update || return 1
   fi
