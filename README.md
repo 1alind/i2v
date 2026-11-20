@@ -21,17 +21,17 @@ pkg update
 pkg install git
 git clone https://github.com/1alind/i2v.git
 cd i2v
-bash run.sh
+bash r.sh
 ```
 
-**Setup and runtime are split:** `run.sh` is the persistent supervisor. It calls `manage.sh prepare` once, then runs the Node server and watches its exit code. `manage.sh` handles Termux packages, Node/npm checks, dependency repair, manual updates, status, and logs. Setup verifies that Express and Multer load, checks JavaScript syntax and writable storage, and logs to `~/i2v-data/logs/setup.log`. It does not delete model files or uploads.
+**Setup and runtime are split:** `r.sh` is the persistent supervisor. It calls `manage.sh prepare` once, then runs the Node server and watches its exit code. `manage.sh` handles Termux packages, Node/npm checks, dependency repair, manual updates, status, and logs. Setup verifies that Express and Multer load, checks JavaScript syntax and writable storage, and logs to `~/i2v-data/logs/setup.log`. It does not delete model files or uploads.
 Open http://127.0.0.1:9999 on the phone. The startup log also prints a `Same-Wi-Fi URL` such as `http://192.168.1.23:9999`; open that address on another device connected to the same Wi-Fi.
 
 ## Automatic updates
 
-When launched with `bash run.sh`, the server checks GitHub every 60 seconds. If a new commit is available, it waits for active model downloads to finish, refuses to overwrite local source edits, fast-forward updates the project, reinstalls npm dependencies if package files changed, and exits with a restart code. The still-running `run.sh` supervisor catches that code and launches the updated server. Setup is not repeated. The open website detects the version change and reloads itself. Update activity is written to `~/i2v-data/logs/updates.log`.
+When launched with `bash r.sh`, the server checks GitHub every 60 seconds. If a new commit is available, it waits for active model downloads to finish, refuses to overwrite local source edits, fast-forward updates the project, reinstalls npm dependencies if package files changed, and exits with a restart code. The still-running `r.sh` supervisor catches that code and launches the updated server. Setup is not repeated. The open website detects the version change and reloads itself. Update activity is written to `~/i2v-data/logs/updates.log`.
 
-The phone must have internet access and Git installed. Automatic restart works when started through `bash run.sh`, not when running `node server.js` directly. If local source edits are detected, the updater pauses rather than overwriting them. For manual maintenance use `bash manage.sh status`, `bash manage.sh logs`, or `bash manage.sh update`. Manual update requires the supervisor to be stopped; while it is running, the built-in updater handles updates and restarts automatically. Stop it with `bash manage.sh stop` or Ctrl+C in its Termux session.
+The phone must have internet access and Git installed. Automatic restart works when started through `bash r.sh`, not when running `node server.js` directly. If local source edits are detected, the updater pauses rather than overwriting them. For manual maintenance use `bash manage.sh status`, `bash manage.sh logs`, or `bash manage.sh update`. Manual update requires the supervisor to be stopped; while it is running, the built-in updater handles updates and restarts automatically. Stop it with `bash manage.sh stop` or Ctrl+C in its Termux session.
 
 ## Data locations
 
