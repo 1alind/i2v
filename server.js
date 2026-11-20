@@ -155,6 +155,18 @@ app.get("/outputs/:name", (req, res) => {
 });
 
 app.listen(PORT, HOST, () => {
-  console.log("Termux I2V listening at http://" + HOST + ":" + PORT);
+  console.log("Termux I2V listening on port " + PORT);
+  if (HOST === "0.0.0.0" || HOST === "::") {
+    const nets = os.networkInterfaces();
+    for (const entries of Object.values(nets)) {
+      for (const net of entries || []) {
+        if (net.family === "IPv4" && !net.internal) {
+          console.log("Same-Wi-Fi URL: http://" + net.address + ":" + PORT);
+        }
+      }
+    }
+  } else {
+    console.log("Local URL: http://" + HOST + ":" + PORT);
+  }
   console.log("Data directory: " + DATA);
 });
