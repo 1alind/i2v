@@ -127,6 +127,47 @@ async function refreshModels() {
     $("modelList").replaceChildren(make("div", "empty-state", error.message));
   }
 }
+async function refreshCatalog() {
+  const list = $("catalogList");
+  try {
+    const {data} = await api("/api/catalog");
+    list.replaceChildren();
+    if (!data.models.length) {
+      list.append(make("div", "empty-state", "No catalog models available."));
+      return;
+    }
+    for (const model of data.models) {
+      const card = make("article", "catalog-card");
+      const head = make("div", "catalog-card-head");
+      const title = make("div", "catalog-name", model.name);
+      const tag = make("span", "catalog-tag", model.status);
+      head.append(title, tag);
+      const meta = make("div", "catalog-meta", model.category + " · " + model.format + " · " + model.size);
+      const desc = make("p", "catalog-description", model.description);
+      const warning = make("p", "catalog-warning", model.compatibility);
+      const button = make("button", "catalog-download", "Download to device ↓");
+      button.disabled = false;
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        button.textContent = "Starting…";
+        try {
+          await api("/api/catalog/" + encodeURIComponent(model.id) + "/download", {method:"POST"});
+          await refreshDownloads();
+          button.textContent = "Downloading…";
+        } catch (error) {
+          alert(error.message);
+          button.disabled = false;
+          button.textContent = "Download to device ↓";
+        }
+      });
+      card.append(head, meta, desc, warning, button);
+      list.append(card);
+    }
+  } catch (error) {
+    list.replaceChildren(make("div", "empty-state", error.message));
+  }
+}
+
 async function refreshDownloads() {
   try {
     const {data} = await api("/api/downloads");
@@ -192,6 +233,8 @@ $("downloadModel").addEventListener("click", async () => {
   }
 });
 $("refreshModels").addEventListener("click", refreshModels);
+$("refreshCatalog").addEventListener("click", refreshCatalog);
+refreshCatalog();
 refreshModels();
 refreshDownloads();
 setInterval(refreshDownloads, 1000);
