@@ -15,6 +15,22 @@
       <span id="serverState" class="state">Connecting…</span>
     </header>
 
+    <nav class="tabs"><a href="#studio">Studio</a><a href="#modelManager" class="active">Model manager</a></nav>
+
+    <section class="panel model-panel" id="modelManager">
+      <div class="section-title"><span>01</span><div><h2>Model manager</h2><p>Download model files directly to this device</p></div></div>
+      <label class="field-label" for="modelUrl">Model file URL</label>
+      <input id="modelUrl" class="text-input" type="url" placeholder="https://huggingface.co/.../resolve/main/model.safetensors" autocomplete="url">
+      <label class="field-label" for="modelFilename">Save as <small>(optional)</small></label>
+      <input id="modelFilename" class="text-input" type="text" placeholder="Automatically use the original filename">
+      <button id="downloadModel" class="download-button">Download to device <span>↓</span></button>
+      <p class="footnote">Supports direct HTTPS file links from Hugging Face and GitHub. Files are saved in ~/i2v-data/models.</p>
+      <div id="downloadList" class="download-list"><div class="empty-state">No active downloads.</div></div>
+      <div class="model-heading"><h3>Stored models</h3><button id="refreshModels" class="small-button">Refresh</button></div>
+      <div id="modelList" class="model-list"><div class="empty-state">Loading model files…</div></div>
+    </section>
+
+    <div id="studio">
     <section class="panel">
       <div class="section-title"><span>01</span><div><h2>Source image</h2><p>Choose a JPG, PNG, or WebP image</p></div></div>
       <label class="drop" for="imageInput" id="dropArea">
@@ -46,7 +62,8 @@
       </div>
       <p class="footnote">This interface runs locally. It does not use WebGPU or upload your image to a cloud service.</p>
     </section>
-    </div>\n    <footer>TERMUX I2V <span>•</span> 127.0.0.1:9999</footer>
+    </div>
+    <footer>TERMUX I2V <span>•</span> 127.0.0.1:9999</footer>
   </main>
   <script src="/app.js"></script>
 </body>
