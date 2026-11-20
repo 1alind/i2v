@@ -10,6 +10,7 @@ const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const execFileAsync = promisify(execFile);
 const { buildReport, repairStorage } = require("./engine/doctor");
+const { detectDevice } = require("./engine/device");
 
 const app = express();
 const HOST = process.env.HOST || "0.0.0.0";
@@ -144,6 +145,7 @@ app.get("/api/updates/log", (_req, res) => {
 
 async function probeEngineRuntime() {
   const runtime = { python: null, torch: null, cuda: false, onnx: null, onnxProviders: [], ffmpeg: false };
+  const devicePromise = detectDevice();
   try {
     const script = [
       "import importlib.util, json",
@@ -168,6 +170,7 @@ async function probeEngineRuntime() {
     await execFileAsync("ffmpeg", ["-version"], { timeout: 5000, maxBuffer: 256 * 1024 });
     runtime.ffmpeg = true;
   } catch {}
+  runtime.device = await devicePromise;
   return runtime;
 }
 
@@ -177,7 +180,8 @@ app.get("/api/engine/diagnostics", async (_req, res) => {
     const report = buildReport({
       dataDir: DATA,
       runtime,
-      memory: { free: os.freemem(), total: os.totalmem() }
+      memory: { free: os.freemem(), total: os.totalmem() },
+      device: runtime.device
     });
     res.set("Cache-Control", "no-store");
     res.json(report);
@@ -194,7 +198,8 @@ app.post("/api/engine/repair", async (_req, res) => {
     const report = buildReport({
       dataDir: DATA,
       runtime,
-      memory: { free: os.freemem(), total: os.totalmem() }
+      memory: { free: os.freemem(), total: os.totalmem() },
+      device: runtime.device
     });
     res.json({ ...result, report });
   } catch (error) {
