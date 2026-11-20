@@ -108,7 +108,7 @@ say "Checking each required Node package..."
 node - <<'NODE'
 for (const name of ["express", "multer"]) {
   const pkg = require(name);
-  console.log("OK:", name, require(name + "/package.json").version);
+  console.log("OK:", name, "loaded from", require.resolve(name));
 }
 NODE
 
