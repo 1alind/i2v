@@ -123,8 +123,10 @@ function buildReport({ dataDir, runtime = {}, memory = {}, device = null }) {
     },
     {
       id: "cuda", label: "CUDA inference backend",
-      status: runtime.cuda ? "pass" : "blocked",
-      detail: runtime.cuda ? "CUDA is available." : "No NVIDIA CUDA device detected. The app will choose an Android-compatible runtime instead."
+      status: runtime.cuda ? "pass" : device?.android ? "not-applicable" : "blocked",
+      detail: runtime.cuda ? "CUDA is available." : device?.android
+        ? "Not applicable on Android: this device does not use an NVIDIA CUDA GPU. The app will use an Android-compatible backend when supported."
+        : "No NVIDIA CUDA device detected. A non-CUDA backend must be used."
     },
     {
       id: "onnx", label: "ONNX Runtime",
