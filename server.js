@@ -156,7 +156,7 @@ async function probeEngineRuntime() {
       " import onnxruntime as ort",
       " out['onnx'] = ort.__version__",
       "print(json.dumps(out))"
-    ].join("\\n");
+    ].join("\n");
     const { stdout } = await execFileAsync("python3", ["-c", script], { timeout: 45000, maxBuffer: 1024 * 1024 });
     Object.assign(runtime, JSON.parse(stdout.trim()));
   } catch {}
@@ -184,7 +184,8 @@ app.get("/api/engine/diagnostics", async (_req, res) => {
 
 app.post("/api/engine/repair", async (_req, res) => {
   try {
-    const result = await repairStorage(DATA);
+    const activePartNames = [...activeDownloads.values()].filter(d => ["queued", "downloading"].includes(d.status)).map(d => "." + d.name + "." + d.id + ".part");
+    const result = await repairStorage(DATA, { activePartNames });
     const runtime = await probeEngineRuntime();
     const report = buildReport({
       dataDir: DATA,
