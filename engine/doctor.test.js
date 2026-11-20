@@ -5,9 +5,17 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { buildReport, repairStorage, REQUIRED_MODELS } = require("./doctor");
+const { buildReport, repairStorage, selectBackend, REQUIRED_MODELS } = require("./doctor");
 
 function tempDir() { return fs.mkdtempSync(path.join(os.tmpdir(), "i2v-doctor-")); }
+
+test("automatic backend selection prefers Android NNAPI then XNNPACK then CPU", () => {
+  assert.equal(selectBackend({ onnxProviders: ["CPUExecutionProvider", "XnnpackExecutionProvider", "NnapiExecutionProvider"] }).id, "onnx-nnapi");
+  assert.equal(selectBackend({ onnxProviders: ["CPUExecutionProvider", "XnnpackExecutionProvider"] }).id, "onnx-xnnpack");
+  assert.equal(selectBackend({ onnxProviders: ["CPUExecutionProvider"] }).id, "onnx-cpu");
+  assert.equal(selectBackend({ cuda: true, onnxProviders: [] }).id, "pytorch-cuda");
+  assert.equal(selectBackend({}).id, "none");
+});
 
 test("model checks distinguish present, missing and suspiciously small files", () => {
   const root = tempDir();
