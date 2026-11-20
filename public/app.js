@@ -325,3 +325,57 @@ async function checkAppUpdates() {
 }
 checkAppUpdates();
 setInterval(checkAppUpdates, 5000);
+
+
+async function loadEngineDiagnostics() {
+  const state = $("engineTestState");
+  const list = $("engineChecks");
+  if (!state || !list) return;
+  state.textContent = "Running engine checks…";
+  state.className = "report-state running";
+  try {
+    const {data} = await api("/api/engine/diagnostics");
+    state.textContent = data.ready ? "Checks passed · inference smoke test still required" : data.summary;
+    state.className = "report-state " + (data.ready ? "passed" : "failed");
+    list.replaceChildren();
+    for (const check of data.checks || []) {
+      const item = document.createElement("div");
+      item.className = "engine-check " + check.status;
+      const heading = document.createElement("div");
+      heading.className = "engine-check-heading";
+      const name = document.createElement("strong");
+      name.textContent = check.label;
+      const badge = document.createElement("span");
+      badge.textContent = check.status.toUpperCase();
+      heading.append(name, badge);
+      const detail = document.createElement("p");
+      detail.textContent = check.detail;
+      item.append(heading, detail);
+      list.append(item);
+    }
+    $("engineNote").textContent = data.note || "";
+  } catch (error) {
+    state.textContent = "Diagnostics failed: " + error.message;
+    state.className = "report-state failed";
+  }
+}
+if ($("runEngineTests")) $("runEngineTests").addEventListener("click", loadEngineDiagnostics);
+if ($("repairEngine")) $("repairEngine").addEventListener("click", async () => {
+  const button = $("repairEngine");
+  button.disabled = true;
+  button.textContent = "Repairing…";
+  try {
+    const {data} = await api("/api/engine/repair", {method:"POST"});
+    const state = $("engineTestState");
+    state.textContent = data.repaired.join(" ") + " " + (data.report?.summary || "");
+    state.className = "report-state " + (data.report?.ready ? "passed" : "running");
+    await loadEngineDiagnostics();
+  } catch (error) {
+    $("engineTestState").textContent = "Safe repair failed: " + error.message;
+    $("engineTestState").className = "report-state failed";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Safe auto-fix";
+  }
+});
+if ($("engineChecks")) loadEngineDiagnostics();
