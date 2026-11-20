@@ -101,3 +101,21 @@ test("safe repair creates storage folders and removes only stale partial files",
   for (const dir of ["uploads", "outputs", "jobs", "logs"]) assert.equal(fs.existsSync(path.join(root, dir)), true);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test("Video VAE only passes when the official LTX config and full weights exist", () => {
+  const root = tempDir();
+  const vae = path.join(root, "models", "video-vae");
+  fs.mkdirSync(vae, { recursive: true });
+  fs.writeFileSync(path.join(vae, "config.json"), JSON.stringify({
+    _class_name: "AutoencoderKLLTXVideo",
+    latent_channels: 128
+  }));
+  let report = buildReport({ dataDir: root });
+  assert.equal(report.checks.find(x => x.id === "vae").status, "fail");
+  const fd = fs.openSync(path.join(vae, "diffusion_pytorch_model.safetensors"), "w");
+  fs.ftruncateSync(fd, Math.ceil(1.5 * 1024 * 1024 * 1024));
+  fs.closeSync(fd);
+  report = buildReport({ dataDir: root });
+  assert.equal(report.checks.find(x => x.id === "vae").status, "pass");
+  fs.rmSync(root, { recursive: true, force: true });
+});
