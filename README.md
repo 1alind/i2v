@@ -42,11 +42,14 @@ Set `I2V_DATA_DIR` to change the data directory.
 
 - `GET /api/health`
 - `GET /api/config`
-- `GET /api/models`
+- `GET /api/models` and `DELETE /api/models/:name`
+- `GET /api/downloads`, `POST /api/downloads`, and `DELETE /api/downloads/:id`
 - `POST /api/upload` (multipart field: `image`)
 - `POST /api/jobs` (JSON: `{ "imageId": "...", "prompt": "...", "frames": 16 }`)
 - `GET /api/jobs/:id`
 - `GET /api/jobs/:id/log`
+
+The Model Manager page accepts direct HTTPS file URLs from Hugging Face and GitHub, shows download progress, transfer speed and estimated time remaining, supports cancellation, and lists/deletes stored files. Downloads are saved directly into `~/i2v-data/models`. These files are stored locally but are not automatically runnable: a compatible inference adapter is still needed.
 
 Generation returns HTTP 503 until a compatible inference adapter is installed. The server never labels a placeholder or fake video as generated output.
 
