@@ -79,6 +79,15 @@ function buildReport({ dataDir, runtime = {}, memory = {} }) {
       detail: runtime.onnx ? "ONNX Runtime " + runtime.onnx + " detected." : "ONNX Runtime is not importable. Installing it alone will not convert the .pth checkpoints."
     },
     {
+      id: "onnx-backends",
+      label: "ONNX hardware execution providers",
+      status: runtime.onnx ? "warn" : "missing",
+      detail: !runtime.onnx ? "Cannot inspect providers because ONNX Runtime is unavailable." :
+        (Array.isArray(runtime.onnxProviders) && runtime.onnxProviders.length
+          ? "Available providers: " + runtime.onnxProviders.join(", ") + ". Provider presence does not prove this phone or model is supported."
+          : "ONNX Runtime is installed, but no execution-provider list was returned. CPU execution may still be available; Qualcomm acceleration is unconfirmed.")
+    },
+    {
       id: "ffmpeg",
       label: "FFmpeg",
       status: runtime.ffmpeg ? "pass" : "missing",
@@ -98,7 +107,7 @@ function buildReport({ dataDir, runtime = {}, memory = {} }) {
     dataDir,
     checks,
     summary: blocking.length ? blocking.length + " blocking check(s). Generation remains disabled." : "Checks passed. A real inference smoke test is still required.",
-    note: "File-size checks are only sanity checks, not checkpoint integrity or compatibility verification. The official MobileI2V Python pipeline is CUDA-oriented; ONNX Runtime presence does not make .pth files runnable."
+    note: "File-size checks are only sanity checks, not checkpoint integrity or compatibility verification. The official PyTorch pipeline is CUDA-oriented; ONNX Runtime presence does not make .pth files runnable. QNN/NNAPI provider presence must be followed by a device-specific model smoke test."
   };
 }
 
