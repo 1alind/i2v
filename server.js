@@ -16,6 +16,14 @@ const PORT = Number(process.env.PORT || 9999);
 const ROOT = path.resolve(__dirname);
 const UPDATE_INTERVAL_MS = 60 * 1000;
 let updateCheckRunning = false;
+let httpServer = null;
+function requestServerRestart() {
+  setTimeout(() => {
+    if (!httpServer) return process.exit(75);
+    httpServer.close(() => process.exit(75));
+    if (typeof httpServer.closeAllConnections === "function") httpServer.closeAllConnections();
+  }, 500);
+}
 let dependencyRepairNeeded = false;
 let updateState = { status: "checking", current: null, latest: null, checkedAt: null, message: "Waiting for first update check." };
 function logUpdate(message) {
@@ -45,7 +53,7 @@ async function checkForUpdates() {
         dependencyRepairNeeded = false;
         updateState = { status: "restarting", current, latest, checkedAt: new Date().toISOString(), message: "Dependencies repaired. Restarting server now." };
         logUpdate(updateState.message);
-        setTimeout(() => process.exit(75), 500);
+        requestServerRestart();
         return;
       }
       updateState = { status: "current", current, latest, checkedAt: new Date().toISOString(), message: "App is up to date." };
@@ -74,7 +82,7 @@ async function checkForUpdates() {
     }
     updateState = { status: "restarting", current: latest, latest, checkedAt: new Date().toISOString(), message: "Update installed. Restarting server now." };
     logUpdate("Update installed successfully. Restarting server.");
-    setTimeout(() => process.exit(75), 500);
+    requestServerRestart();
   } catch (error) {
     updateState = { ...updateState, status: "error", checkedAt: new Date().toISOString(), message: "Update check failed: " + (error.message || String(error)) };
     logUpdate(updateState.message);
@@ -428,7 +436,7 @@ app.get("/outputs/:name", (req, res) => {
   res.sendFile(file);
 });
 
-app.listen(PORT, HOST, () => {
+httpServer = app.listen(PORT, HOST, () => {
   console.log("Termux I2V listening on port " + PORT);
   if (HOST === "0.0.0.0" || HOST === "::") {
     const nets = os.networkInterfaces();
