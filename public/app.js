@@ -272,6 +272,12 @@ async function checkAppUpdates() {
     const response = await fetch("/api/version", { cache: "no-store" });
     if (!response.ok) throw new Error("Server returned " + response.status);
     const info = await response.json();
+    if ($("updateLog")) {
+      try {
+        const logResponse = await fetch("/api/updates/log", { cache: "no-store" });
+        $("updateLog").textContent = logResponse.ok ? await logResponse.text() : "Update history unavailable.";
+      } catch { $("updateLog").textContent = "Update history unavailable while reconnecting."; }
+    }
     const state = info.update || {};
     const badge = $("updateState");
     if (badge) {
