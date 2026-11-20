@@ -60,7 +60,7 @@ $("generate").addEventListener("click", async () => {
     const {response,data} = await api("/api/jobs", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({imageId:uploadedImageId,prompt:$("prompt").value,frames:17})
+      body:JSON.stringify({imageId:uploadedImageId,prompt:$("prompt").value,frames:Number($("frames").value)})
     });
     if (!response.ok) throw new Error(data.error || "Could not start generation.");
     const jobId = data.job.id;
