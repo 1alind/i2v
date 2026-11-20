@@ -132,14 +132,19 @@ say "Starting local I2V server on http://127.0.0.1:9999"
 while true; do
   say "Launching I2V server..."
   set +e
-  npm start
+  node server.js
   SERVER_EXIT=$?
   set -e
   if [ "$SERVER_EXIT" -eq 75 ]; then
-    say "Automatic update requested a restart. Relaunching without rerunning setup..."
+    say "Automatic update requested a restart (exit 75). Relaunching the updated server without rerunning setup..."
     sleep 1
     continue
   fi
   say "Server stopped with exit code $SERVER_EXIT."
-  exit "$SERVER_EXIT"
+  if [ "$SERVER_EXIT" -ne 0 ]; then
+    say "Unexpected server exit. Restarting in 3 seconds; press Ctrl+C to stop the supervisor."
+    sleep 3
+    continue
+  fi
+  exit 0
 done
