@@ -87,9 +87,37 @@ function allowedDownloadHost(host) {
   return host === "huggingface.co" || host.endsWith(".huggingface.co") ||
     host === "hf.co" || host.endsWith(".hf.co") ||
     host === "github.com" || host.endsWith(".github.com") ||
-    host === "githubusercontent.com" || host.endsWith(".githubusercontent.com");
+    host === "githubusercontent.com" || host.endsWith(".githubusercontent.com") ||
+    host === "xethub.hf.co" || host.endsWith(".xethub.hf.co");
 }
 const activeDownloads = new Map();
+
+const MODEL_CATALOG = [
+  {
+    id: "mobilei2v-checkpoint",
+    name: "MobileI2V checkpoint",
+    file: "hybrid_371.pth",
+    url: "https://huggingface.co/hustvl/MobileI2V/resolve/main/hybrid_371.pth",
+    size: "1.07 GB",
+    format: "PyTorch .pth",
+    category: "Image-to-video",
+    status: "Experimental weights",
+    description: "Official 270M MobileI2V checkpoint from HUST Vision Lab.",
+    compatibility: "Not directly usable by this Termux app. The published checkpoint is PyTorch and needs the model's Python pipeline or a verified mobile conversion."
+  },
+  {
+    id: "turbo-vaed-ltx",
+    name: "Turbo-VAED LTX decoder",
+    file: "Turbo-VAED-LTX.pth",
+    url: "https://huggingface.co/hustvl/Turbo-VAED/resolve/main/Turbo-VAED-LTX.pth",
+    size: "169 MB",
+    format: "PyTorch .pth",
+    category: "Video decoder",
+    status: "Dependency",
+    description: "Official mobile-oriented video VAE decoder variant referenced by the MobileI2V workflow.",
+    compatibility: "A component only, not a standalone generator. The published file is PyTorch, not a ready-to-run Android/ONNX model."
+  }
+];
 
 function safeModelName(input) {
   const name = path.basename(String(input || ""));
@@ -157,6 +185,29 @@ async function downloadModel(d) {
     d.error = err.message || "Download failed.";
   }
 }
+
+app.get("/api/catalog", (_req, res) => {
+  res.json({ models: MODEL_CATALOG.map(({ url, ...model }) => model) });
+});
+
+app.post("/api/catalog/:id/download", (req, res) => {
+  const model = MODEL_CATALOG.find(item => item.id === req.params.id);
+  if (!model) return res.status(404).json({ error: "Catalog model not found." });
+  const name = safeModelName(model.file);
+  if (fs.existsSync(path.join(DIRS.models, name))) {
+    return res.status(409).json({ error: "This model file is already stored on the device." });
+  }
+  if ([...activeDownloads.values()].some(d => d.name === name && ["queued", "downloading"].includes(d.status))) {
+    return res.status(409).json({ error: "This model is already downloading." });
+  }
+  const d = {
+    id: crypto.randomUUID(), name, url: model.url, status: "queued", bytes: 0, total: 0,
+    startedAt: Date.now(), controller: new AbortController(), error: null
+  };
+  activeDownloads.set(d.id, d);
+  res.status(202).json(publicDownload(d));
+  downloadModel(d);
+});
 
 app.get("/api/downloads", (_req, res) => {
   res.json({ downloads: [...activeDownloads.values()].map(publicDownload) });
