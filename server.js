@@ -214,7 +214,7 @@ app.get("/api/setup-report", (_req, res) => {
   if (!fs.existsSync(file)) return res.json({ available: false, status: "not-run", report: "", updatedAt: null });
   const stat = fs.statSync(file);
   const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
-  const report = lines.slice(-300).join("\n");
+  const report = lines.slice(-35).join("\n");
   const failed = /SETUP FAILED|\\b(error|failed)\\b/i.test(report.split("\n").slice(-12).join("\n")) && !/All dependencies and startup checks passed/.test(report.split("\n").slice(-12).join("\n"));
   const passed = /All dependencies and startup checks passed/.test(report);
   res.json({ available: true, status: failed ? "failed" : passed ? "passed" : "running", report, updatedAt: stat.mtime.toISOString(), bytes: stat.size });
