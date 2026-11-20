@@ -345,7 +345,7 @@ async function downloadQwenBundle(d, model) {
       }
       if (!response || !response.ok) throw new Error(filename + " download failed: HTTP " + (response ? response.status : "redirect limit"));
       const length = Number(response.headers.get("content-length") || 0);
-      if (Number.isFinite(length) && length > 0) d.total += length;
+
       const destination = path.join(staging, filename);
       const temp = destination + ".part";
       const output = fs.createWriteStream(temp, { flags: "wx" });
@@ -381,6 +381,7 @@ async function downloadQwenBundle(d, model) {
     }
     if (fs.existsSync(folder)) throw new Error("Qwen2-0.5B appeared during download. Existing folder was preserved.");
     fs.renameSync(staging, folder);
+    d.total = d.bytes;
     d.status = "completed";
     d.completedAt = Date.now();
   } catch (error) {
