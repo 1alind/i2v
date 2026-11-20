@@ -143,7 +143,7 @@ app.get("/api/updates/log", (_req, res) => {
 });
 
 async function probeEngineRuntime() {
-  const runtime = { python: null, torch: null, cuda: false, onnx: null, ffmpeg: false };
+  const runtime = { python: null, torch: null, cuda: false, onnx: null, onnxProviders: [], ffmpeg: false };
   try {
     const script = [
       "import importlib.util, json",
@@ -155,10 +155,14 @@ async function probeEngineRuntime() {
       "if importlib.util.find_spec('onnxruntime'):",
       " import onnxruntime as ort",
       " out['onnx'] = ort.__version__",
+      " out['onnx_providers'] = ort.get_available_providers()",
       "print(json.dumps(out))"
     ].join("\n");
     const { stdout } = await execFileAsync("python3", ["-c", script], { timeout: 45000, maxBuffer: 1024 * 1024 });
-    Object.assign(runtime, JSON.parse(stdout.trim()));
+    const detected = JSON.parse(stdout.trim());
+    Object.assign(runtime, detected);
+    runtime.onnxProviders = detected.onnx_providers || [];
+    delete runtime.onnx_providers;
   } catch {}
   try {
     await execFileAsync("ffmpeg", ["-version"], { timeout: 5000, maxBuffer: 256 * 1024 });
