@@ -6,11 +6,69 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const os = require("node:os");
+const { execFile } = require("node:child_process");
+const { promisify } = require("node:util");
+const execFileAsync = promisify(execFile);
 
 const app = express();
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 9999);
 const ROOT = path.resolve(__dirname);
+const UPDATE_INTERVAL_MS = 60 * 1000;
+let updateCheckRunning = false;
+let updateState = { status: "checking", current: null, latest: null, checkedAt: null, message: "Waiting for first update check." };
+function logUpdate(message) {
+  const line = "[" + new Date().toISOString() + "] " + message + "\n";
+  fs.appendFileSync(path.join(DATA, "logs", "updates.log"), line);
+  console.log("[update] " + message);
+}
+async function gitOutput(args) {
+  const { stdout } = await execFileAsync("git", args, { cwd: ROOT, timeout: 120000, maxBuffer: 2 * 1024 * 1024 });
+  return stdout.trim();
+}
+async function checkForUpdates() {
+  if (updateCheckRunning) return;
+  updateCheckRunning = true;
+  try {
+    const branch = await gitOutput(["branch", "--show-current"]);
+    if (!branch) throw new Error("Project is not on a named Git branch.");
+    const current = await gitOutput(["rev-parse", "HEAD"]);
+    updateState = { ...updateState, current, checkedAt: new Date().toISOString(), status: "checking", message: "Checking GitHub for updates." };
+    await gitOutput(["fetch", "--quiet", "origin", branch]);
+    const latest = await gitOutput(["rev-parse", "origin/" + branch]);
+    if (latest === current) {
+      updateState = { status: "current", current, latest, checkedAt: new Date().toISOString(), message: "App is up to date." };
+      return;
+    }
+    const status = await gitOutput(["status", "--porcelain"]);
+    if (status) {
+      updateState = { status: "local-changes", current, latest, checkedAt: new Date().toISOString(), message: "Update found, but local project edits exist. Automatic update paused to protect them." };
+      logUpdate(updateState.message);
+      return;
+    }
+    if ([...activeDownloads.values()].some(d => ["queued", "downloading"].includes(d.status))) {
+      updateState = { status: "waiting", current, latest, checkedAt: new Date().toISOString(), message: "Update found. Waiting for model downloads to finish before updating." };
+      return;
+    }
+    updateState = { status: "updating", current, latest, checkedAt: new Date().toISOString(), message: "New version found. Updating project files." };
+    logUpdate("Update available: " + current.slice(0, 8) + " -> " + latest.slice(0, 8));
+    const changed = await gitOutput(["diff", "--name-only", current, latest]);
+    await gitOutput(["merge", "--ff-only", "origin/" + branch]);
+    if (changed.split("\n").some(file => ["package.json", "package-lock.json"].includes(file))) {
+      updateState.message = "Project updated. Installing updated dependencies before restart.";
+      logUpdate(updateState.message);
+      await execFileAsync("npm", ["install", "--no-audit", "--no-fund", "--fetch-retries=3", "--fetch-timeout=120000"], { cwd: ROOT, timeout: 15 * 60 * 1000, maxBuffer: 4 * 1024 * 1024 });
+    }
+    updateState = { status: "restarting", current: latest, latest, checkedAt: new Date().toISOString(), message: "Update installed. Restarting server now." };
+    logUpdate("Update installed successfully. Restarting server.");
+    setTimeout(() => process.exit(75), 500);
+  } catch (error) {
+    updateState = { ...updateState, status: "error", checkedAt: new Date().toISOString(), message: "Update check failed: " + (error.message || String(error)) };
+    logUpdate(updateState.message);
+  } finally {
+    updateCheckRunning = false;
+  }
+}
 const DATA = path.resolve(process.env.I2V_DATA_DIR || path.join(process.env.HOME || ROOT, "i2v-data"));
 const DIRS = {
   models: path.join(DATA, "models"),
@@ -49,6 +107,18 @@ function writeJson(file, value) {
   fs.writeFileSync(file, JSON.stringify(value, null, 2));
 }
 function jobFile(id) { return path.join(DIRS.jobs, id + ".json"); }
+
+app.get("/api/version", (_req, res) => {
+  let current = null;
+  try { current = require("node:child_process").execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(); } catch {}
+  res.set("Cache-Control", "no-store");
+  res.json({ current, update: updateState, serverTime: new Date().toISOString() });
+});
+
+app.get("/api/updates/log", (_req, res) => {
+  const file = path.join(DIRS.logs, "updates.log");
+  res.type("text").send(fs.existsSync(file) ? fs.readFileSync(file, "utf8").split(/\r?\n/).slice(-100).join("\n") : "No update activity yet.");
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -360,4 +430,7 @@ app.listen(PORT, HOST, () => {
     console.log("Local URL: http://" + HOST + ":" + PORT);
   }
   console.log("Data directory: " + DATA);
+  console.log("Automatic GitHub updates: checking every 60 seconds.");
+  checkForUpdates();
+  setInterval(checkForUpdates, UPDATE_INTERVAL_MS).unref();
 });
