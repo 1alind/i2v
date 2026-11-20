@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const os = require("node:os");
-const { execFile } = require("node:child_process");
+const { execFile, spawn } = require("node:child_process");
 const { promisify } = require("node:util");
 const execFileAsync = promisify(execFile);
 const { buildReport, repairStorage } = require("./engine/doctor");
@@ -622,8 +622,46 @@ app.post("/api/upload", (req, res) => {
   });
 });
 
+function runInferenceJob(job) {
+  const imagePath = path.join(DIRS.uploads, job.imageId);
+  const runner = path.join(ROOT, "engine", "mobilei2v_runner.py");
+  const python = process.env.PYTHON || "python3";
+  const child = spawn(python, [runner, "--data", DATA, "--image", imagePath, "--prompt", job.prompt, "--job", job.id], {
+    cwd: ROOT, env: { ...process.env, PYTHONUNBUFFERED: "1" }, stdio: ["ignore", "pipe", "pipe"]
+  });
+  let stdout = "", stderr = "";
+  const save = () => writeJson(jobFile(job.id), job);
+  child.stdout.on("data", chunk => {
+    stdout += chunk.toString();
+    const lines = stdout.split(/\r?\n/);
+    stdout = lines.pop() || "";
+    for (const line of lines) {
+      try {
+        const event = JSON.parse(line);
+        if (event.event === "progress") { job.message = event.message; job.progress = Math.min(90, job.progress + 5); save(); }
+        if (event.event === "complete") {
+          job.status = "completed"; job.progress = 100; job.message = "Video generated successfully.";
+          job.output = "/outputs/" + job.id + "/result.mp4"; job.outputBytes = event.bytes; job.backend = event.backend; save();
+        }
+        if (event.event === "failed") job.error = event.error;
+      } catch {}
+    }
+  });
+  child.stderr.on("data", chunk => { stderr = (stderr + chunk.toString()).slice(-12000); });
+  child.on("error", error => {
+    job.status = "failed"; job.message = "Could not start the Python inference runner."; job.error = error.message; save();
+  });
+  child.on("close", code => {
+    if (job.status === "completed") return;
+    job.status = "failed"; job.progress = 0;
+    job.message = job.error || (code === 0 ? "Inference ended without a valid MP4 output." : "MobileI2V inference failed.");
+    if (stderr) job.error = (job.error || "") + "\n" + stderr.slice(-6000);
+    save();
+  });
+}
+
 app.post("/api/jobs", (req, res) => {
-  const { imageId, prompt = "", frames = 16 } = req.body || {};
+  const { imageId, prompt = "", frames = 17 } = req.body || {};
   if (!imageId || typeof imageId !== "string" || path.basename(imageId) !== imageId) {
     return res.status(400).json({ error: "A valid uploaded imageId is required." });
   }
@@ -633,29 +671,24 @@ app.post("/api/jobs", (req, res) => {
   if (typeof prompt !== "string" || prompt.length > 1000) {
     return res.status(400).json({ error: "Prompt must be a string under 1000 characters." });
   }
-  if (!Number.isInteger(frames) || frames < 8 || frames > 32) {
-    return res.status(400).json({ error: "Frames must be an integer between 8 and 32." });
+  if (frames !== 17) {
+    return res.status(400).json({ error: "Official MobileI2V currently generates 17 frames. Select 17 frames to continue." });
   }
-
+  if ([...activeDownloads.values()].some(d => ["queued", "downloading"].includes(d.status))) {
+    return res.status(409).json({ error: "Wait for model downloads to finish before starting inference." });
+  }
+  const id = crypto.randomUUID();
   const job = {
-    id: crypto.randomUUID(),
-    status: "blocked",
-    createdAt: new Date().toISOString(),
-    imageId,
-    prompt,
-    frames,
-    progress: 0,
-    message: "Generation is unavailable: no compatible inference adapter is installed.",
-    output: null
+    id, status: "queued", createdAt: new Date().toISOString(), imageId, prompt, frames,
+    progress: 0, message: "Queued for official MobileI2V inference.", output: null, error: null
   };
-  writeJson(jobFile(job.id), job);
-  res.status(503).json({
-    error: "Inference backend is not installed.",
-    job,
-    details: "The web server and upload pipeline are ready, but this repository does not yet contain a model/runtime combination verified for Termux ARM64 and the Adreno 642L."
+  writeJson(jobFile(id), job);
+  res.status(202).json({ job });
+  setImmediate(() => {
+    job.status = "running"; job.message = "Starting official MobileI2V inference."; writeJson(jobFile(id), job);
+    runInferenceJob(job);
   });
 });
-
 app.get("/api/jobs/:id", (req, res) => {
   if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(400).json({ error: "Invalid job id." });
   const file = jobFile(req.params.id);
