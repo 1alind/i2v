@@ -263,3 +263,45 @@ setInterval(refreshDownloads, 1000);
 
 refreshSetupReport();
 setInterval(refreshSetupReport, 5000);
+
+let lastSeenVersion = null;
+let serverWasUnavailable = false;
+let reloadScheduled = false;
+async function checkAppUpdates() {
+  try {
+    const response = await fetch("/api/version", { cache: "no-store" });
+    if (!response.ok) throw new Error("Server returned " + response.status);
+    const info = await response.json();
+    const state = info.update || {};
+    const badge = $("updateState");
+    if (badge) {
+      badge.className = "report-state " + (["current"].includes(state.status) ? "passed" : ["error","local-changes"].includes(state.status) ? "failed" : ["updating","restarting","waiting"].includes(state.status) ? "running" : "");
+      badge.textContent = state.status === "current" ? "✓ App is up to date" :
+        state.status === "updating" ? "↓ Update downloading/installing" :
+        state.status === "restarting" ? "↻ Restarting with new version" :
+        state.status === "waiting" ? "Update ready · waiting for model downloads" :
+        state.status === "local-changes" ? "Update paused · local edits detected" :
+        state.status === "error" ? "Update check error" : "Automatic updates: " + (state.status || "checking");
+    }
+    if ($("updateMessage")) $("updateMessage").textContent = (state.message || "Checking for updates.") + (state.checkedAt ? " Last check: " + new Date(state.checkedAt).toLocaleTimeString() : "");
+    if (lastSeenVersion === null && info.current) lastSeenVersion = info.current;
+    else if (info.current && lastSeenVersion && info.current !== lastSeenVersion && !reloadScheduled) {
+      reloadScheduled = true;
+      if ($("updateMessage")) $("updateMessage").textContent = "New version is running. Refreshing this page…";
+      setTimeout(() => location.reload(), 700);
+    }
+    if (serverWasUnavailable && !reloadScheduled) {
+      reloadScheduled = true;
+      if ($("updateMessage")) $("updateMessage").textContent = "Server is back online. Refreshing this page…";
+      setTimeout(() => location.reload(), 700);
+    }
+    serverWasUnavailable = false;
+  } catch {
+    serverWasUnavailable = true;
+    const badge = $("updateState");
+    if (badge) { badge.className = "report-state running"; badge.textContent = "Server restarting or reconnecting…"; }
+    if ($("updateMessage")) $("updateMessage").textContent = "The page will reconnect and refresh automatically when the updated server is back.";
+  }
+}
+checkAppUpdates();
+setInterval(checkAppUpdates, 5000);
