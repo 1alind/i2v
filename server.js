@@ -241,7 +241,7 @@ app.get("/api/config", (_req, res) => {
 
 app.get("/api/models", (_req, res) => {
   const models = fs.readdirSync(DIRS.models, { withFileTypes: true })
-    .filter(x => x.isFile() || (x.isDirectory() && x.name === "Qwen2-0.5B"))
+    .filter(x => x.isFile() || (x.isDirectory() && ["Qwen2-0.5B", "video-vae"].includes(x.name)))
     .map(x => {
       const p = path.join(DIRS.models, x.name);
       if (x.isFile()) return { name: x.name, bytes: fs.statSync(p).size };
@@ -291,6 +291,18 @@ const MODEL_CATALOG = [
     compatibility: "A component only, not a standalone generator. The published file is PyTorch, not a ready-to-run Android/ONNX model."
   },
   {
+    id: "ltx-video-vae",
+    name: "LTX Video VAE encoder",
+    folder: "video-vae",
+    files: ["config.json", "diffusion_pytorch_model.safetensors"],
+    size: "About 1.68 GB",
+    format: "Diffusers VAE folder",
+    category: "Video VAE",
+    status: "Required dependency",
+    description: "Official LTX Video VAE encoder used by MobileI2V to encode the input image into its video latent space.",
+    compatibility: "Downloads the original LTX Video VAE config and weights into ~/i2v-data/models/video-vae. The separate Turbo-VAED-LTX.pth remains the decoder component."
+  },
+  {
     id: "qwen2-05b",
     name: "Qwen2-0.5B text encoder",
     folder: "Qwen2-0.5B",
@@ -321,6 +333,71 @@ function publicDownload(d) {
     error: d.error || null
   };
 }
+async function downloadLtxVaeBundle(d, model) {
+  const folder = path.join(DIRS.models, model.folder);
+  const staging = path.join(DIRS.models, "." + model.folder + "." + d.id + ".part");
+  try {
+    if (fs.existsSync(folder)) throw new Error("The video-vae folder already exists. It was not overwritten.");
+    fs.mkdirSync(staging, { recursive: false });
+    d.status = "downloading";
+    for (const filename of model.files) {
+      if (d.controller.signal.aborted) throw new Error("Download cancelled.");
+      let current = new URL("https://huggingface.co/Lightricks/LTX-Video/resolve/main/vae/" + filename);
+      let response;
+      for (let redirects = 0; redirects <= 8; redirects++) {
+        if (current.protocol !== "https:" || !allowedDownloadHost(current.hostname)) throw new Error("Blocked unsafe model download host.");
+        response = await fetch(current, { redirect: "manual", signal: d.controller.signal });
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+          const location = response.headers.get("location");
+          if (!location) throw new Error("Hugging Face redirected without a location.");
+          current = new URL(location, current);
+          continue;
+        }
+        break;
+      }
+      if (!response || !response.ok) throw new Error(filename + " download failed: HTTP " + (response ? response.status : "redirect limit"));
+      const length = Number(response.headers.get("content-length") || 0);
+      const destination = path.join(staging, filename);
+      const temp = destination + ".part";
+      const output = fs.createWriteStream(temp, { flags: "wx" });
+      let fileBytes = 0;
+      try {
+        for await (const chunk of response.body) {
+          if (d.controller.signal.aborted) throw new Error("Download cancelled.");
+          fileBytes += chunk.length;
+          d.bytes += chunk.length;
+          if (!output.write(chunk)) await new Promise((resolve, reject) => {
+            output.once("drain", resolve);
+            output.once("error", reject);
+          });
+        }
+        await new Promise((resolve, reject) => output.end(err => err ? reject(err) : resolve()));
+        if (length && fileBytes !== length) throw new Error(filename + " was incomplete: expected " + length + " bytes, received " + fileBytes + ".");
+        fs.renameSync(temp, destination);
+      } catch (error) {
+        output.destroy();
+        try { fs.rmSync(temp, { force: true }); } catch {}
+        throw error;
+      }
+    }
+    const config = JSON.parse(fs.readFileSync(path.join(staging, "config.json"), "utf8"));
+    const weights = path.join(staging, "diffusion_pytorch_model.safetensors");
+    if (config._class_name !== "AutoencoderKLLTXVideo" || config.latent_channels !== 128 ||
+        !fs.existsSync(weights) || fs.statSync(weights).size < 1.5 * 1024 * 1024 * 1024) {
+      throw new Error("Downloaded LTX Video VAE files failed validation. The incomplete folder was discarded.");
+    }
+    if (fs.existsSync(folder)) throw new Error("video-vae appeared during download. Existing folder was preserved.");
+    fs.renameSync(staging, folder);
+    d.total = d.bytes;
+    d.status = "completed";
+    d.completedAt = Date.now();
+  } catch (error) {
+    try { fs.rmSync(staging, { recursive: true, force: true }); } catch {}
+    d.status = d.controller.signal.aborted ? "cancelled" : "failed";
+    d.error = error.message || "Video VAE download failed.";
+  }
+}
+
 async function downloadQwenBundle(d, model) {
   const folder = path.join(DIRS.models, model.folder);
   const staging = path.join(DIRS.models, "." + model.folder + "." + d.id + ".part");
@@ -450,15 +527,16 @@ app.post("/api/catalog/:id/download", (req, res) => {
   if (!model) return res.status(404).json({ error: "Catalog model not found." });
   if (model.folder) {
     const target = path.join(DIRS.models, model.folder);
-    if (fs.existsSync(target)) return res.status(409).json({ error: "The Qwen2-0.5B folder already exists on this device." });
-    if ([...activeDownloads.values()].some(d => d.name.startsWith(model.folder) && ["queued", "downloading"].includes(d.status))) {
-      return res.status(409).json({ error: "Qwen2-0.5B is already downloading." });
+    if (fs.existsSync(target)) return res.status(409).json({ error: model.folder + " already exists on this device." });
+    if ([...activeDownloads.values()].some(d => d.name === model.folder && ["queued", "downloading"].includes(d.status))) {
+      return res.status(409).json({ error: model.folder + " is already downloading." });
     }
     const d = { id: crypto.randomUUID(), name: model.folder, status: "queued", bytes: 0, total: 0,
       startedAt: Date.now(), controller: new AbortController(), error: null };
     activeDownloads.set(d.id, d);
     res.status(202).json(publicDownload(d));
-    downloadQwenBundle(d, model);
+    if (model.id === "ltx-video-vae") downloadLtxVaeBundle(d, model);
+    else downloadQwenBundle(d, model);
     return;
   }
   const name = safeModelName(model.file);
@@ -525,7 +603,7 @@ app.delete("/api/models/:name", (req, res) => {
   const file = path.join(DIRS.models, name);
   if (!fs.existsSync(file)) return res.status(404).json({ error: "Model not found." });
   const stat = fs.statSync(file);
-  if (stat.isDirectory() && name !== "Qwen2-0.5B") return res.status(400).json({ error: "Only known model folders can be deleted." });
+  if (stat.isDirectory() && !["Qwen2-0.5B", "video-vae"].includes(name)) return res.status(400).json({ error: "Only known model folders can be deleted." });
   if (stat.isDirectory()) fs.rmSync(file, { recursive: true, force: true });
   else fs.unlinkSync(file);
   res.json({ ok: true, deleted: name });
