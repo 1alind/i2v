@@ -328,7 +328,6 @@ async function downloadQwenBundle(d, model) {
     if (fs.existsSync(folder)) throw new Error("The Qwen2-0.5B folder already exists. It was not overwritten.");
     fs.mkdirSync(staging, { recursive: false });
     d.status = "downloading";
-    d.name = model.folder + "/ (7 files)";
     for (const filename of model.files) {
       if (d.controller.signal.aborted) throw new Error("Download cancelled.");
       let current = new URL("https://huggingface.co/Qwen/Qwen2-0.5B/resolve/main/" + filename);
@@ -384,7 +383,6 @@ async function downloadQwenBundle(d, model) {
     fs.renameSync(staging, folder);
     d.status = "completed";
     d.completedAt = Date.now();
-    d.name = model.folder;
   } catch (error) {
     try { fs.rmSync(staging, { recursive: true, force: true }); } catch {}
     d.status = d.controller.signal.aborted ? "cancelled" : "failed";
