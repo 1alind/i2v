@@ -16,7 +16,7 @@ async function refreshStatus() {
     $("serverState").textContent = "Local server online";
     $("serverState").style.color = "var(--accent)";
     if ($("serverValue")) $("serverValue").textContent = "Online";
-    if ($("engineValue")) $("engineValue").textContent = health.inference.available ? "Ready" : "Not installed";
+    if ($("engineValue")) $("engineValue").textContent = health.inference.installed ? "Adapter installed" : "Not installed";
     if ($("modelValue")) $("modelValue").textContent = models.models.length + " file(s)";
     if ($("jobStatus")) $("jobStatus").textContent = health.inference.reason || "Inference engine ready.";
   } catch (error) {
