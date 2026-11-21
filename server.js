@@ -71,6 +71,15 @@ async function checkForUpdates() {
       updateState = { status: "waiting", current, latest, checkedAt: new Date().toISOString(), message: "Update found. Waiting for model downloads to finish before updating." };
       return;
     }
+    const inferenceRunning = fs.readdirSync(path.join(DATA, "jobs")).some(name => {
+      if (!name.endsWith(".json")) return false;
+      const job = readJson(path.join(DATA, "jobs", name), {});
+      return ["queued", "running"].includes(job.status);
+    });
+    if (inferenceRunning) {
+      updateState = { status: "waiting", current, latest, checkedAt: new Date().toISOString(), message: "Update found. Waiting for the active video generation to finish before restarting." };
+      return;
+    }
     updateState = { status: "updating", current, latest, checkedAt: new Date().toISOString(), message: "New version found. Updating project files." };
     logUpdate("Update available: " + current.slice(0, 8) + " -> " + latest.slice(0, 8));
     const changed = await gitOutput(["diff", "--name-only", current, latest]);
