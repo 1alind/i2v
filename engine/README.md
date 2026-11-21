@@ -7,7 +7,7 @@ Required files under `~/i2v-data/models`:
 - `Qwen2-0.5B/`
 - `video-vae/`
 
-The runner automatically installs the portable Python dependencies it needs (including Pyrallis, Diffusers, Timm, Accelerate, SafeTensors and OmegaConf) without replacing the existing PyTorch/TorchVision installation. On Termux it installs the native `opencv` package for the `cv2` module because upstream pip OpenCV wheels are not Android wheels. It intentionally does not install the upstream `requirements.txt`, because that file pins CUDA/NVIDIA packages and would replace the device's working PyTorch stack.
+The runner automatically installs the portable Python dependencies it needs (including Pyrallis, Diffusers, Timm, Accelerate, SafeTensors and OmegaConf) without replacing the existing PyTorch/TorchVision installation. OpenCV is deliberately omitted: upstream uses `cv2` only for optional MP4 input, while this app supplies still images. The runner patches that unused import and video-input branch out of its private upstream copy, avoiding an unavailable Android package. It intentionally does not install the upstream `requirements.txt`, because that file pins CUDA/NVIDIA packages and would replace the device's working PyTorch stack.
 
 On devices without CUDA, the runner selects CPU and patches only the upstream inference copy to keep tensors in the configured FP32 dtype instead of forcing FP16 CPU tensors. This is an experimental compatibility path, not a performance guarantee. The A52s has not yet been verified with a completed end-to-end generation. RAM pressure or unsupported upstream dependencies may still prevent a run.
 
