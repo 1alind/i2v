@@ -99,24 +99,10 @@ def main():
         if not module_exists(module):
             raise RuntimeError(f"pip reported success for {package}, but Python still cannot import {module}.")
 
-    # OpenCV's pip wheels are not built for Termux/Android. Use the native Termux
-    # package, which supplies the cv2 Python module for the Termux interpreter.
-    if not module_exists("cv2") and shutil.which("pkg"):
-        emit("progress", message="Installing native Termux OpenCV package…")
-        cv_result = subprocess.run(["pkg", "install", "-y", "opencv"], text=True,
-                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        if cv_result.returncode or not module_exists("cv2"):
-            emit("warning", message="Termux OpenCV install did not complete; refreshing package indexes and retrying. "
-                 + (cv_result.stdout or "")[-1000:])
-            subprocess.run(["pkg", "update", "-y"], check=False,
-                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            cv_result = subprocess.run(["pkg", "install", "-y", "opencv"], text=True,
-                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        if cv_result.returncode or not module_exists("cv2"):
-            raise RuntimeError("Could not install/import cv2 from the native Termux opencv package. "
-                               + (cv_result.stdout or "")[-1400:])
+    # OpenCV is only used by upstream for optional MP4-as-input support.
+    # This app accepts still images, so no Android OpenCV package is required.
 
-    required = ["torch", "torchvision", "PIL", "yaml", "pyrallis", "einops", "cv2",
+    required = ["torch", "torchvision", "PIL", "yaml", "pyrallis", "einops",
                 "transformers", "diffusers", "timm", "safetensors", "accelerate", "omegaconf"]
     missing = [name for name in required if importlib.util.find_spec(name) is None]
     if missing:
@@ -137,6 +123,13 @@ def main():
     shutil.copytree(repo, work, ignore=shutil.ignore_patterns(".git", "output", "test_video"))
     script = work / "scripts" / "inference_i2v.py"
     source = script.read_text()
+    # Remove OpenCV dependency for still-image input. The upstream cv2 branch is
+    # only for video files; this app's generation input is an image.
+    source = source.replace("import cv2", "# OpenCV omitted: still-image input only")
+    source = source.replace(
+        '            if image_path.split(\'.\')[-1]=="mp4":',
+        '            if image_path.split(\'.\')[-1].lower()=="mp4":\\n                raise RuntimeError("Video input is not supported on this Android build; upload a still image.")'
+    )
     source = source.replace("z = z.half()", "z = z.to(dtype=weight_dtype)")
     source = source.replace("ref_image = ref_image.half()", "ref_image = ref_image.to(dtype=weight_dtype)")
     source = source.replace("        torch.cuda.empty_cache()", "        if torch.cuda.is_available():\n            torch.cuda.empty_cache()")
