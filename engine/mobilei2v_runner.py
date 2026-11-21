@@ -62,12 +62,42 @@ def main():
         "safetensors": "safetensors>=0.6.2",
         "omegaconf": "omegaconf==2.3.0",
     }
-    missing_portable = [package for module, package in portable.items()
-                        if importlib.util.find_spec(module) is None]
-    if missing_portable:
-        emit("progress", message="Installing missing MobileI2V Python packages (without replacing PyTorch)…")
-        subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", *missing_portable],
-                       check=True)
+    def module_exists(module):
+        try:
+            return importlib.util.find_spec(module) is not None
+        except (ImportError, ValueError, AttributeError):
+            return False
+
+    def pip_attempt(package, no_deps=False):
+        cmd = [sys.executable, "-m", "pip", "install", "--no-cache-dir"]
+        if no_deps:
+            cmd.append("--no-deps")
+        cmd.append(package)
+        result = subprocess.run(cmd, text=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT)
+        if result.returncode:
+            detail = (result.stdout or "")[-1800:]
+            emit("warning", message=f"Install attempt failed for {package}"
+                 + (" (dependency-free fallback)" if no_deps else "")
+                 + ": " + detail[-900:])
+        return result.returncode == 0
+
+    # Android is not a supported psutil build target. Some otherwise portable
+    # packages (notably accelerate) declare psutil as an unconditional dependency.
+    # Install normally first, then retry without dependency resolution when the
+    # platform rejects a transitive package. Existing torch/torchvision are never
+    # upgraded or replaced.
+    missing_portable = [(module, package) for module, package in portable.items()
+                        if not module_exists(module)]
+    for module, package in missing_portable:
+        emit("progress", message=f"Installing Python dependency: {package}")
+        if not pip_attempt(package):
+            emit("progress", message=f"Retrying {package} without optional dependency resolution…")
+            if not pip_attempt(package, no_deps=True):
+                raise RuntimeError(f"Could not install {package}, including the Android-safe fallback. "
+                                   "See the preceding installation warning for the exact pip error.")
+        if not module_exists(module):
+            raise RuntimeError(f"pip reported success for {package}, but Python still cannot import {module}.")
 
     # OpenCV's pip wheels are not built for Termux/Android. Use the native Termux
     # package, which supplies the cv2 Python module for the Termux interpreter.
