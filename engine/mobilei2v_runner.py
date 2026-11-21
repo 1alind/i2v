@@ -101,9 +101,20 @@ def main():
 
     # OpenCV's pip wheels are not built for Termux/Android. Use the native Termux
     # package, which supplies the cv2 Python module for the Termux interpreter.
-    if importlib.util.find_spec("cv2") is None and shutil.which("pkg"):
+    if not module_exists("cv2") and shutil.which("pkg"):
         emit("progress", message="Installing native Termux OpenCV package…")
-        subprocess.run(["pkg", "install", "-y", "opencv"], check=True)
+        cv_result = subprocess.run(["pkg", "install", "-y", "opencv"], text=True,
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if cv_result.returncode or not module_exists("cv2"):
+            emit("warning", message="Termux OpenCV install did not complete; refreshing package indexes and retrying. "
+                 + (cv_result.stdout or "")[-1000:])
+            subprocess.run(["pkg", "update", "-y"], check=False,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            cv_result = subprocess.run(["pkg", "install", "-y", "opencv"], text=True,
+                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if cv_result.returncode or not module_exists("cv2"):
+            raise RuntimeError("Could not install/import cv2 from the native Termux opencv package. "
+                               + (cv_result.stdout or "")[-1400:])
 
     required = ["torch", "torchvision", "PIL", "yaml", "pyrallis", "einops", "cv2",
                 "transformers", "diffusers", "timm", "safetensors", "accelerate", "omegaconf"]
