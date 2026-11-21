@@ -611,7 +611,7 @@ app.delete("/api/models/:name", (req, res) => {
 });
 
 const DEFAULT_SAMPLE_IMAGE = "sample-mountain-valley.jpg";
-const DEFAULT_SAMPLE_URL = "https://upload.wikimedia.org/wikipedia/commons/6/6a/Beautiful_mountain_valley_and_lake_landscape.jpg";
+const DEFAULT_SAMPLE_URL = "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1280&h=720&fit=crop&fm=jpg&q=85";
 let sampleImageDownload = null;
 
 async function ensureDefaultSampleImage() {
