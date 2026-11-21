@@ -51,11 +51,36 @@ def main():
     elif not (repo / "scripts" / "inference_i2v.py").is_file():
         raise RuntimeError("The cached MobileI2V source folder is incomplete. Remove i2v-data/runtime/MobileI2V and retry.")
 
-    required = ["torch", "torchvision", "PIL", "yaml", "pyrallis", "einops", "cv2", "transformers", "diffusers", "timm", "safetensors"]
+    # Install only the portable Python dependencies used by the official inference
+    # path. Never install upstream requirements.txt: it pins CUDA wheels and replaces
+    # the device's existing PyTorch build.
+    portable = {
+        "pyrallis": "pyrallis==0.3.1",
+        "diffusers": "diffusers==0.35.2",
+        "timm": "timm==1.0.20",
+        "accelerate": "accelerate==1.1.0",
+        "safetensors": "safetensors>=0.6.2",
+        "omegaconf": "omegaconf==2.3.0",
+    }
+    missing_portable = [package for module, package in portable.items()
+                        if importlib.util.find_spec(module) is None]
+    if missing_portable:
+        emit("progress", message="Installing missing MobileI2V Python packages (without replacing PyTorch)…")
+        subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", *missing_portable],
+                       check=True)
+
+    # OpenCV's pip wheels are not built for Termux/Android. Use the native Termux
+    # package, which supplies the cv2 Python module for the Termux interpreter.
+    if importlib.util.find_spec("cv2") is None and shutil.which("pkg"):
+        emit("progress", message="Installing native Termux OpenCV package…")
+        subprocess.run(["pkg", "install", "-y", "opencv"], check=True)
+
+    required = ["torch", "torchvision", "PIL", "yaml", "pyrallis", "einops", "cv2",
+                "transformers", "diffusers", "timm", "safetensors", "accelerate", "omegaconf"]
     missing = [name for name in required if importlib.util.find_spec(name) is None]
     if missing:
-        raise RuntimeError("Official MobileI2V Python dependencies are missing: " + ", ".join(missing) +
-                           ". This Termux build will not install the upstream CUDA-pinned requirements.txt.")
+        raise RuntimeError("Still missing after automatic dependency setup: " + ", ".join(missing) +
+                           ". The Termux OpenCV package or a Python dependency could not be installed.")
 
     import torch
     if torch.cuda.is_available():
