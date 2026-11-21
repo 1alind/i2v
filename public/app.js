@@ -27,6 +27,25 @@ async function refreshStatus() {
 }
 
 if ($("imageInput")) {
+  $("prompt").value = $("prompt").value.trim() || "Create a subtle, realistic cinematic animation of this mountain valley. Slowly push the camera forward toward the lake, let the clouds drift gently across the distant peaks, and add faint natural movement to the water and grass. Preserve the original landscape, lighting, colors, and composition. No cuts, no new objects, no scene changes.";
+
+  async function loadDefaultSample() {
+    $("uploadStatus").textContent = "Downloading the built-in sample image…";
+    try {
+      const {data} = await api("/api/sample-image");
+      uploadedImageId = data.imageId;
+      $("preview").src = data.previewUrl + "?v=" + Date.now();
+      $("preview").hidden = false;
+      $("dropText").hidden = true;
+      $("uploadStatus").textContent = "Default sample loaded · " + (data.bytes / 1024).toFixed(0) + " KB · stored locally";
+      $("generate").disabled = false;
+    } catch (error) {
+      $("uploadStatus").textContent = "Sample image unavailable: " + error.message + " · Select your own image instead.";
+      $("generate").disabled = true;
+    }
+  }
+  loadDefaultSample();
+
 $("imageInput").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
