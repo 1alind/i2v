@@ -6,6 +6,7 @@ ONNX graphs or synthesize placeholder videos.
 """
 import argparse
 import importlib.util
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -61,11 +62,19 @@ def main():
         "accelerate": "accelerate==1.1.0",
         "safetensors": "safetensors>=0.6.2",
         "omegaconf": "omegaconf==2.3.0",
+        "requests": "requests>=2.25.1",
     }
     def module_exists(module):
         try:
             return importlib.util.find_spec(module) is not None
         except (ImportError, ValueError, AttributeError):
+            return False
+
+    def distribution_exists(name):
+        try:
+            importlib.metadata.version(name)
+            return True
+        except importlib.metadata.PackageNotFoundError:
             return False
 
     def pip_attempt(package, no_deps=False):
@@ -88,7 +97,8 @@ def main():
     # platform rejects a transitive package. Existing torch/torchvision are never
     # upgraded or replaced.
     missing_portable = [(module, package) for module, package in portable.items()
-                        if not module_exists(module)]
+                        if not module_exists(module) or
+                        (module == "requests" and not distribution_exists("requests"))]
     for module, package in missing_portable:
         emit("progress", message=f"Installing Python dependency: {package}")
         if not pip_attempt(package):
@@ -96,8 +106,8 @@ def main():
             if not pip_attempt(package, no_deps=True):
                 raise RuntimeError(f"Could not install {package}, including the Android-safe fallback. "
                                    "See the preceding installation warning for the exact pip error.")
-        if not module_exists(module):
-            raise RuntimeError(f"pip reported success for {package}, but Python still cannot import {module}.")
+        if not module_exists(module) or (module == "requests" and not distribution_exists("requests")):
+            raise RuntimeError(f"pip reported success for {package}, but Python still cannot import {module} or its package metadata is missing.")
 
     # OpenCV is only used by upstream for optional MP4-as-input support.
     # This app accepts still images, so no Android OpenCV package is required.
