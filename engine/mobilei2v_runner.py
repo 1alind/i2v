@@ -107,7 +107,7 @@ def main():
     missing = [name for name in required if importlib.util.find_spec(name) is None]
     if missing:
         raise RuntimeError("Still missing after automatic dependency setup: " + ", ".join(missing) +
-                           ". The Termux OpenCV package or a Python dependency could not be installed.")
+                           ". Review the package installation warnings above for the Android-compatible fallback failure.")
 
     import torch
     if torch.cuda.is_available():
