@@ -103,7 +103,11 @@ $("generate").addEventListener("click", async () => {
       }
     }
   } catch (error) {
-    $("jobStatus").textContent = error.message;
+    const message = error.message || "Unknown network error";
+    $("jobStatus").textContent = message === "Load failed" || message === "Failed to fetch"
+      ? "Lost connection to the local server while starting generation. The server may have restarted. Wait for it to come back online, refresh this page, then retry. (" + message + ")"
+      : message;
+    refreshStatus();
   } finally {
     $("generate").disabled = false;
   }
