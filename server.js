@@ -610,6 +610,51 @@ app.delete("/api/models/:name", (req, res) => {
   res.json({ ok: true, deleted: name });
 });
 
+const DEFAULT_SAMPLE_IMAGE = "sample-mountain-valley.jpg";
+const DEFAULT_SAMPLE_URL = "https://upload.wikimedia.org/wikipedia/commons/6/6a/Beautiful_mountain_valley_and_lake_landscape.jpg";
+let sampleImageDownload = null;
+
+async function ensureDefaultSampleImage() {
+  const destination = path.join(DIRS.uploads, DEFAULT_SAMPLE_IMAGE);
+  if (fs.existsSync(destination) && fs.statSync(destination).size > 0) return destination;
+  if (sampleImageDownload) return sampleImageDownload;
+  sampleImageDownload = (async () => {
+    const response = await fetch(DEFAULT_SAMPLE_URL, { headers: { "User-Agent": "TermuxI2V/1.0 (local sample image)" } });
+    if (!response.ok) throw new Error("Sample image download failed: HTTP " + response.status);
+    const type = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (type !== "image/jpeg") throw new Error("Sample image source returned an unexpected content type: " + (type || "unknown"));
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > 15 * 1024 * 1024 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+      throw new Error("Downloaded sample image failed JPEG validation.");
+    }
+    const temporary = destination + ".part";
+    fs.writeFileSync(temporary, bytes, { flag: "w" });
+    fs.renameSync(temporary, destination);
+    return destination;
+  })();
+  try { return await sampleImageDownload; }
+  finally { sampleImageDownload = null; }
+}
+
+app.get("/api/sample-image", async (_req, res) => {
+  try {
+    const file = await ensureDefaultSampleImage();
+    res.set("Cache-Control", "no-store");
+    res.json({ imageId: DEFAULT_SAMPLE_IMAGE, name: "Mountain valley and lake (default sample)", bytes: fs.statSync(file).size, previewUrl: "/api/sample-image/file" });
+  } catch (error) {
+    res.status(502).json({ error: error.message || "Could not download the default sample image." });
+  }
+});
+
+app.get("/api/sample-image/file", async (_req, res) => {
+  try {
+    const file = await ensureDefaultSampleImage();
+    res.type("jpg").set("Cache-Control", "public, max-age=86400").sendFile(file);
+  } catch (error) {
+    res.status(502).type("text").send(error.message || "Sample image unavailable.");
+  }
+});
+
 app.post("/api/upload", (req, res) => {
   upload.single("image")(req, res, err => {
     if (err) return res.status(400).json({ error: err.message || "Upload failed" });
