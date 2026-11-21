@@ -215,7 +215,7 @@ app.get("/api/health", (_req, res) => {
     host: HOST,
     port: PORT,
     dataDir: DATA,
-    inference: { available: false, reason: "No compatible local inference adapter is installed." }
+    inference: { available: fs.existsSync(path.join(ROOT, "engine", "mobilei2v_runner.py")), installed: true, ready: false, reason: "Official MobileI2V runner is installed. Python dependencies and model compatibility are checked when a generation job starts." }
   });
 });
 
@@ -678,6 +678,12 @@ app.post("/api/jobs", (req, res) => {
   if ([...activeDownloads.values()].some(d => ["queued", "downloading"].includes(d.status))) {
     return res.status(409).json({ error: "Wait for model downloads to finish before starting inference." });
   }
+  const busy = fs.readdirSync(DIRS.jobs).some(name => {
+    if (!name.endsWith(".json")) return false;
+    const existing = readJson(path.join(DIRS.jobs, name), {});
+    return ["queued", "running"].includes(existing.status);
+  });
+  if (busy) return res.status(409).json({ error: "Another inference job is already running. Wait for it to finish." });
   const id = crypto.randomUUID();
   const job = {
     id, status: "queued", createdAt: new Date().toISOString(), imageId, prompt, frames,
