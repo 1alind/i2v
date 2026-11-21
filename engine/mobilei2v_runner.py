@@ -128,7 +128,7 @@ def main():
     source = source.replace("import cv2", "# OpenCV omitted: still-image input only")
     source = source.replace(
         '            if image_path.split(\'.\')[-1]=="mp4":',
-        '            if image_path.split(\'.\')[-1].lower()=="mp4":\\n                raise RuntimeError("Video input is not supported on this Android build; upload a still image.")'
+        '            if image_path.split(\'.\')[-1].lower()=="mp4":\n                raise RuntimeError("Video input is not supported on this Android build; upload a still image.")'
     )
     source = source.replace("z = z.half()", "z = z.to(dtype=weight_dtype)")
     source = source.replace("ref_image = ref_image.half()", "ref_image = ref_image.to(dtype=weight_dtype)")
