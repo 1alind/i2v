@@ -16,7 +16,7 @@ const app = express();
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 9999);
 const ROOT = path.resolve(__dirname);
-const UPDATE_INTERVAL_MS = 60 * 1000;
+const UPDATE_INTERVAL_MS = 30 * 1000;
 let updateCheckRunning = false;
 let httpServer = null;
 function requestServerRestart() {
@@ -782,7 +782,7 @@ httpServer = app.listen(PORT, HOST, () => {
     console.log("Local URL: http://" + HOST + ":" + PORT);
   }
   console.log("Data directory: " + DATA);
-  console.log("Automatic GitHub updates: checking every 60 seconds.");
+  console.log("Automatic GitHub updates: checking every 30 seconds.");
   checkForUpdates();
   setInterval(checkForUpdates, UPDATE_INTERVAL_MS).unref();
 });
