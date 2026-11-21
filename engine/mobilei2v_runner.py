@@ -63,6 +63,9 @@ def main():
         "safetensors": "safetensors>=0.6.2",
         "omegaconf": "omegaconf==2.3.0",
         "requests": "requests>=2.25.1",
+        "termcolor": "termcolor>=2.0.0",
+        "pytz": "pytz>=2023.3",
+        "tqdm": "tqdm>=4.60.0",
     }
     def module_exists(module):
         try:
@@ -133,6 +136,12 @@ def main():
     shutil.copytree(repo, work, ignore=shutil.ignore_patterns(".git", "output", "test_video"))
     script = work / "scripts" / "inference_i2v.py"
     source = script.read_text()
+    # The upstream inference file does not import its MobileDiT module package,
+    # so its MODELS registry remains empty unless we load the registration module.
+    source = source.replace(
+        "from diffusion.model.builder import build_model, get_tokenizer_and_text_encoder, get_vae, vae_decode, vae_encode",
+        "from diffusion.model.builder import build_model, get_tokenizer_and_text_encoder, get_vae, vae_decode, vae_encode\\nimport diffusion.model.nets"
+    )
     # Remove OpenCV dependency for still-image input. The upstream cv2 branch is
     # only for video files; this app's generation input is an image.
     source = source.replace("import cv2", "# OpenCV omitted: still-image input only")
@@ -144,6 +153,53 @@ def main():
     source = source.replace("ref_image = ref_image.half()", "ref_image = ref_image.to(dtype=weight_dtype)")
     source = source.replace("        torch.cuda.empty_cache()", "        if torch.cuda.is_available():\n            torch.cuda.empty_cache()")
     script.write_text(source)
+
+    # The official helper only recognizes a hard-coded relative Qwen path.
+    # This app stores model files in the persistent data directory, so allow
+    # any existing local model directory without changing remote model names.
+    builder = work / "diffusion" / "model" / "builder.py"
+    builder_source = builder.read_text()
+    assert_line = '    assert name in list(text_encoder_dict.keys()), f"not support this text encoder: {name}"'
+    local_path_support = '    if os.path.isdir(name):\\n        text_encoder_dict[name] = name\\n' + assert_line
+    if assert_line not in builder_source:
+        raise RuntimeError("Upstream text-encoder loader changed; refusing an unsafe patch.")
+    builder.write_text(builder_source.replace(assert_line, local_path_support, 1))
+
+    # MMCV has no suitable Android/Termux wheel. The inference-only code path
+    # needs just Registry, logger_initialized and get_dist_info, not MMCV's
+    # compiled training operators. Supply those small compatibility pieces.
+    mmcv = work / "mmcv"
+    (mmcv / "utils").mkdir(parents=True, exist_ok=True)
+    (mmcv / "runner").mkdir(parents=True, exist_ok=True)
+    (mmcv / "__init__.py").write_text(
+        "import pickle\\nfrom pathlib import Path\\n"
+        "class Registry:\\n"
+        "    def __init__(self, name): self.name, self.module_dict = name, {}\\n"
+        "    def register_module(self, name=None, force=False, module=None):\\n"
+        "        def register(obj):\\n"
+        "            key = name or obj.__name__\\n"
+        "            if key in self.module_dict and not force: raise KeyError(key)\\n"
+        "            self.module_dict[key] = obj\\n"
+        "            return obj\\n"
+        "        return register(module) if module is not None else register\\n"
+        "    def build(self, cfg, default_args=None):\\n"
+        "        args = dict(cfg); kind = args.pop('type')\\n"
+        "        args = dict(default_args or {}, **args)\\n"
+        "        cls = self.module_dict[kind] if isinstance(kind, str) else kind\\n"
+        "        return cls(**args)\\n"
+        "def mkdir_or_exist(path): Path(path).mkdir(parents=True, exist_ok=True)\\n"
+        "def dump(obj, path):\\n"
+        "    with open(path, 'wb') as f: pickle.dump(obj, f)\\n"
+        "def load(path):\\n"
+        "    with open(path, 'rb') as f: return pickle.load(f)\\n"
+    )
+    (mmcv / "utils" / "__init__.py").write_text("")
+    (mmcv / "utils" / "logging.py").write_text("logger_initialized = {}\\n")
+    (mmcv / "runner" / "__init__.py").write_text(
+        "def get_dist_info():\\n"
+        "    import torch.distributed as dist\\n"
+        "    return (dist.get_rank(), dist.get_world_size()) if dist.is_available() and dist.is_initialized() else (0, 1)\\n"
+    )
 
     config_path = work / "configs" / "mobilei2v_config" / "MobileI2V_300M_img512.yaml"
     import yaml
